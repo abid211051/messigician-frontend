@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload, X, UtensilsCrossed } from "lucide-react";
+import { Upload, X, UtensilsCrossed, ArrowLeft } from "lucide-react";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -21,8 +21,13 @@ import {
   createMessSchema,
   type CreateMessFormValues,
 } from "@/lib/validations/mess.validation";
+import { messCreationApi } from "@/app/actions/onboard.action";
+import { toast } from "sonner";
+import { AxiosError } from "axios";
+import { useRouter } from "next/navigation";
 
 const MessCreationForm = () => {
+  const router = useRouter();
   const {
     control,
     handleSubmit,
@@ -33,10 +38,26 @@ const MessCreationForm = () => {
   });
 
   const onSubmit: SubmitHandler<CreateMessFormValues> = async (data) => {
-    const formData = new FormData();
-    formData.append("fname", data.fname);
-    if (data.file) formData.append("file", data.file);
-    console.log("submitting:", data);
+    try {
+      const formData = new FormData();
+      formData.append("fname", data.fname);
+      if (data.file) formData.append("file", data.file);
+      await messCreationApi(formData);
+      toast.success("Mess created successfully!", {
+        position: "top-center",
+        richColors: true,
+      });
+      setTimeout(() => {
+        router.push("/users/owner");
+      }, 3000);
+    } catch (err) {
+      if (err instanceof AxiosError) {
+        toast.error(err.response?.data?.message ?? "Something went wrong", {
+          position: "top-center",
+          richColors: true,
+        });
+      }
+    }
   };
 
   return (
@@ -76,14 +97,14 @@ const MessCreationForm = () => {
         <Controller
           control={control}
           name="file"
-          render={({ field: { value, onChange } }) => (
+          render={({ field }) => (
             <FileUpload
-              value={value ? [value] : []}
-              onValueChange={(files) => onChange(files[0] ?? undefined)}
+              value={field.value ? [field.value] : []}
+              onValueChange={(files) => field.onChange(files[0] ?? undefined)}
               maxFiles={1}
               className="w-full"
             >
-              {!value ? (
+              {!field.value ? (
                 <FileUploadDropzone className="border-border rounded-xl">
                   <div className="flex flex-col items-center gap-2 text-center">
                     <div className="bg-brand-primary-muted p-2.5 rounded-xl">
@@ -111,7 +132,7 @@ const MessCreationForm = () => {
                 </FileUploadDropzone>
               ) : (
                 <FileUploadList>
-                  <FileUploadItem value={value}>
+                  <FileUploadItem value={field.value}>
                     <div className="flex items-center gap-3 p-2 border border-border rounded-xl bg-card w-full">
                       <FileUploadItemPreview className="w-12 h-12 rounded-lg object-cover shrink-0" />
                       <FileUploadItemMetadata className="flex-1 min-w-0 text-sm" />
@@ -121,7 +142,7 @@ const MessCreationForm = () => {
                           size="icon"
                           type="button"
                           className="size-7 shrink-0 text-muted-foreground hover:text-red-500"
-                          onClick={() => onChange(undefined)}
+                          onClick={() => field.onChange(undefined)}
                         >
                           <X className="size-4" />
                         </Button>
@@ -138,6 +159,7 @@ const MessCreationForm = () => {
         )}
       </div>
 
+      {/* hint */}
       <div className="flex items-start gap-2.5 bg-brand-primary-muted border border-brand-primary-border rounded-xl p-3">
         <UtensilsCrossed className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
         <p className="text-xs text-brand-primary leading-relaxed">
@@ -146,13 +168,24 @@ const MessCreationForm = () => {
         </p>
       </div>
 
-      <Button
-        type="submit"
-        className="h-11 bg-brand-primary hover:bg-brand-primary-hover active:scale-[0.98] rounded-xl transition-all duration-150"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? "Creating..." : "Create mess"}
-      </Button>
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1 active:scale-[0.96] rounded-xl h-11"
+          onClick={() => router.push("/onboard")}
+          disabled={isSubmitting}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          className="flex-1 active:scale-[0.96] bg-brand-primary hover:bg-brand-primary-hover font-medium rounded-xl h-11"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Creating..." : "Create"}
+        </Button>
+      </div>
     </form>
   );
 };

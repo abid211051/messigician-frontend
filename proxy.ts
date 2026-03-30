@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const userPrivateRoutes = ["/user/profile"];
-const adminPrivateRoutes = ["/admin/profile"];
+const memberPrivateRoutes = ["/users/member"];
+const managerPrivateRoutes = ["/users/manager"];
+const ownerPrivateRoutes = ["/users/owner"];
 const publicRoutes = ["/"];
+const noMessRoutes = ["/onboard", "/onboard/create", "/onboard/join"];
 
 const isPrivate = (path: string) =>
-  userPrivateRoutes.includes(path) || adminPrivateRoutes.includes(path);
+  memberPrivateRoutes.includes(path) ||
+  managerPrivateRoutes.includes(path) ||
+  ownerPrivateRoutes.includes(path);
 
 // ----- Verify access token ----------
 async function verifyAccessToken(token: string) {
@@ -37,13 +41,33 @@ async function tryRefresh(req: NextRequest) {
 }
 
 // ----- Redirect based on role ----------
-function redirectByRole(role: string, reqPath: string, req: NextRequest) {
-  if (role === "user" && !userPrivateRoutes.includes(reqPath)) {
-    return NextResponse.redirect(new URL("/user/profile", req.url));
+function redirectByMessRole(
+  mess_role: string | null,
+  reqPath: string,
+  req: NextRequest,
+): NextResponse | null {
+  if (!mess_role) {
+    return noMessRoutes.includes(reqPath)
+      ? null
+      : NextResponse.redirect(new URL("/onboard", req.url));
   }
-  if (role === "admin" && !adminPrivateRoutes.includes(reqPath)) {
-    return NextResponse.redirect(new URL("/admin/profile", req.url));
+
+  if (mess_role === "member") {
+    return memberPrivateRoutes.includes(reqPath)
+      ? null
+      : NextResponse.redirect(new URL("/users/member", req.url));
   }
+  if (mess_role === "manager") {
+    return managerPrivateRoutes.includes(reqPath)
+      ? null
+      : NextResponse.redirect(new URL("/users/manager", req.url));
+  }
+  if (mess_role === "owner") {
+    return ownerPrivateRoutes.includes(reqPath)
+      ? null
+      : NextResponse.redirect(new URL("/users/owner", req.url));
+  }
+
   return null;
 }
 
@@ -56,45 +80,46 @@ function forwardCookies(from: Response, to: NextResponse) {
 
 // ----- Main middleware ----------
 export async function proxy(req: NextRequest) {
-  return NextResponse.next();
-  // const accessToken = req.cookies.get("accessToken")?.value;
-  // const refreshToken = req.cookies.get("refreshToken")?.value;
-  // const reqPath = req.nextUrl.pathname;
+  const accessToken = req.cookies.get("accessToken")?.value;
+  const refreshToken = req.cookies.get("refreshToken")?.value;
+  const reqPath = req.nextUrl.pathname;
 
   // // Step 1: Valid access token → redirect by role
-  // if (accessToken) {
-  //   const decoded = await verifyAccessToken(accessToken);
-  //   if (decoded) {
-  //     return (
-  //       redirectByRole(decoded.role as string, reqPath, req) ??
-  //       NextResponse.next()
-  //     );
-  //   }
-  // }
+  if (accessToken) {
+    const decoded = await verifyAccessToken(accessToken);
+    if (decoded) {
+      const redirect = redirectByMessRole(
+        decoded.mess_role as string | null,
+        reqPath,
+        req,
+      );
+      return redirect ?? NextResponse.next();
+    }
+  }
 
-  // // Step 2: No refresh token → redirect to public route
-  // if (!refreshToken) {
-  //   return publicRoutes.includes(reqPath)
-  //     ? NextResponse.next()
-  //     : NextResponse.redirect(new URL("/", req.url));
-  // }
+  // Step 2: No refresh token → redirect to public route
+  if (!refreshToken) {
+    return publicRoutes.includes(reqPath)
+      ? NextResponse.next()
+      : NextResponse.redirect(new URL("/", req.url));
+  }
 
-  // // Step 3: Try refresh
-  // const refreshResponse = await tryRefresh(req);
+  // Step 3: Try refresh
+  const refreshResponse = await tryRefresh(req);
 
-  // if (refreshResponse) {
-  //   const resData = await refreshResponse.json();
-  //   const nextResponse =
-  //     redirectByRole(resData.role, reqPath, req) ?? NextResponse.next();
+  if (refreshResponse) {
+    const resData = await refreshResponse.json();
+    const redirect = redirectByMessRole(resData.mess_role, reqPath, req);
+    const nextResponse = redirect ?? NextResponse.next();
 
-  //   forwardCookies(refreshResponse, nextResponse);
-  //   return nextResponse;
-  // }
+    forwardCookies(refreshResponse, nextResponse);
+    return nextResponse;
+  }
 
-  // // Step 4: Refresh failed
-  // return isPrivate(reqPath)
-  //   ? NextResponse.redirect(new URL("/", req.url))
-  //   : NextResponse.next();
+  // Step 4: Refresh failed
+  return isPrivate(reqPath)
+    ? NextResponse.redirect(new URL("/", req.url))
+    : NextResponse.next();
 }
 
 export const config = {

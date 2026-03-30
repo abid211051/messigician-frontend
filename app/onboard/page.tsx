@@ -90,7 +90,7 @@ export default function OnboardingPage() {
           <Link
             key={li.href}
             href={li.href}
-            className={`flex items-center gap-4 px-5 py-4 ${li.linkBgColor} active:scale-[0.98] rounded-2xl transition-all duration-150`}
+            className={`flex items-center gap-4 px-5 py-4 ${li.linkBgColor} active:scale-[0.96] rounded-2xl transition-all duration-150`}
           >
             <div className={`p-2 ${li.linkIconBgColor} rounded-xl`}>
               {li.icon}
