@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const memberPrivateRoutes = ["/users/member"];
-const managerPrivateRoutes = ["/users/manager"];
-const ownerPrivateRoutes = ["/users/owner"];
 const publicRoutes = ["/"];
 const noMessRoutes = ["/onboard", "/onboard/create", "/onboard/join"];
+const ROLE_BASED_ROUTES = {
+  owner: "/users/owner",
+  manager: "/users/manager",
+  member: "/users/member",
+} as const;
 
-const isPrivate = (path: string) =>
-  memberPrivateRoutes.includes(path) ||
-  managerPrivateRoutes.includes(path) ||
-  ownerPrivateRoutes.includes(path);
+const isPrivate = (path: string) => path.startsWith("/users");
 
-// ----- Verify access token ----------
 async function verifyAccessToken(token: string) {
   try {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
@@ -23,7 +21,6 @@ async function verifyAccessToken(token: string) {
   }
 }
 
-// ----- Try refresh token ----------
 async function tryRefresh(req: NextRequest) {
   try {
     const res = await fetch(
@@ -40,8 +37,7 @@ async function tryRefresh(req: NextRequest) {
   }
 }
 
-// ----- Redirect based on role ----------
-function redirectByMessRole(
+function getRouteRedirect(
   mess_role: string | null,
   reqPath: string,
   req: NextRequest,
@@ -52,43 +48,53 @@ function redirectByMessRole(
       : NextResponse.redirect(new URL("/onboard", req.url));
   }
 
-  if (mess_role === "member") {
-    return memberPrivateRoutes.includes(reqPath)
-      ? null
-      : NextResponse.redirect(new URL("/users/member", req.url));
+  const basePath =
+    ROLE_BASED_ROUTES[mess_role as keyof typeof ROLE_BASED_ROUTES];
+
+  // ✅ Authenticated users should never see the public/landing route
+  if (publicRoutes.includes(reqPath)) {
+    return NextResponse.redirect(new URL(basePath, req.url));
   }
-  if (mess_role === "manager") {
-    return managerPrivateRoutes.includes(reqPath)
-      ? null
-      : NextResponse.redirect(new URL("/users/manager", req.url));
+
+  if (noMessRoutes.includes(reqPath)) {
+    return NextResponse.redirect(new URL(basePath, req.url));
   }
-  if (mess_role === "owner") {
-    return ownerPrivateRoutes.includes(reqPath)
-      ? null
-      : NextResponse.redirect(new URL("/users/owner", req.url));
+
+  if (isPrivate(reqPath) && !reqPath.startsWith(basePath)) {
+    return NextResponse.redirect(new URL(basePath, req.url));
   }
 
   return null;
 }
 
-// ----- Forward cookies from Express response to browser ----------
 function forwardCookies(from: Response, to: NextResponse) {
   from.headers.getSetCookie().forEach((cookie) => {
     to.headers.append("Set-Cookie", cookie);
   });
 }
 
-// ----- Main middleware ----------
+// Extract cookie value by name from a Set-Cookie header array
+function extractCookieValue(
+  setCookieHeaders: string[],
+  name: string,
+): string | null {
+  for (const header of setCookieHeaders) {
+    const match = header.match(new RegExp(`^${name}=([^;]+)`));
+    if (match) return match[1];
+  }
+  return null;
+}
+
 export async function proxy(req: NextRequest) {
   const accessToken = req.cookies.get("accessToken")?.value;
   const refreshToken = req.cookies.get("refreshToken")?.value;
   const reqPath = req.nextUrl.pathname;
 
-  // // Step 1: Valid access token → redirect by role
+  // Step 1: Valid access token → check route, stay on current path
   if (accessToken) {
     const decoded = await verifyAccessToken(accessToken);
     if (decoded) {
-      const redirect = redirectByMessRole(
+      const redirect = getRouteRedirect(
         decoded.mess_role as string | null,
         reqPath,
         req,
@@ -97,26 +103,43 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // Step 2: No refresh token → redirect to public route
+  // Step 2: No refresh token → only public routes allowed
   if (!refreshToken) {
     return publicRoutes.includes(reqPath)
       ? NextResponse.next()
       : NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Step 3: Try refresh
+  // Step 3: Expired access token + refresh token exists → try refresh
   const refreshResponse = await tryRefresh(req);
 
   if (refreshResponse) {
-    const resData = await refreshResponse.json();
-    const redirect = redirectByMessRole(resData.mess_role, reqPath, req);
-    const nextResponse = redirect ?? NextResponse.next();
+    const setCookieHeaders = refreshResponse.headers.getSetCookie();
+    const newAccessToken = extractCookieValue(setCookieHeaders, "accessToken");
 
+    // Verify the new token directly so we don't rely on resData shape
+    // and get the role from the token itself (source of truth)
+    let mess_role: string | null = null;
+
+    if (newAccessToken) {
+      const decoded = await verifyAccessToken(newAccessToken);
+      mess_role = (decoded?.mess_role as string) ?? null;
+    } else {
+      // Fallback to response body if cookie extraction fails
+      const resData = await refreshResponse.json();
+      mess_role = resData.mess_role ?? null;
+    }
+
+    const redirect = getRouteRedirect(mess_role, reqPath, req);
+
+    // KEY FIX: if no redirect needed, let user through to THEIR intended route
+    // and forward the new cookies to the browser
+    const nextResponse = redirect ?? NextResponse.next();
     forwardCookies(refreshResponse, nextResponse);
     return nextResponse;
   }
 
-  // Step 4: Refresh failed
+  // Step 4: Refresh failed → send unauthenticated users to public route
   return isPrivate(reqPath)
     ? NextResponse.redirect(new URL("/", req.url))
     : NextResponse.next();
