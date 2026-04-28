@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={PtSans.variable}>
-      <body className="antialiased">
+      <body className="antialiased bg-slate-200">
         <Toaster />
         {children}
       </body>

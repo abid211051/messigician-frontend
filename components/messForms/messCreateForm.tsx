@@ -21,7 +21,7 @@ import {
   createMessSchema,
   type CreateMessFormValues,
 } from "@/lib/validations/mess.validation";
-import { messCreationApi } from "@/app/actions/onboard.action";
+import { messCreationApi } from "@/app/onboard/actions/onboard.action";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
 import { useRouter } from "next/navigation";
@@ -73,11 +73,9 @@ const MessCreationForm = () => {
             <Input
               {...field}
               placeholder="e.g. Sunshine Mess"
-              className={
-                errors.fname
-                  ? "border-red-400 focus-visible:ring-red-300 min-h-10"
-                  : "min-h-10"
-              }
+              className={`${
+                errors.fname ? "border-red-400 focus-visible:ring-red-300" : ""
+              } bg-card  min-h-12`}
             />
           )}
         />
@@ -102,10 +100,10 @@ const MessCreationForm = () => {
               value={field.value ? [field.value] : []}
               onValueChange={(files) => field.onChange(files[0] ?? undefined)}
               maxFiles={1}
-              className="w-full"
+              className="w-full "
             >
               {!field.value ? (
-                <FileUploadDropzone className="border-border rounded-xl">
+                <FileUploadDropzone className="bg-card border-border rounded-xl">
                   <div className="flex flex-col items-center gap-2 text-center">
                     <div className="bg-brand-primary-muted p-2.5 rounded-xl">
                       <Upload className="size-5 text-brand-primary" />
@@ -132,8 +130,8 @@ const MessCreationForm = () => {
                 </FileUploadDropzone>
               ) : (
                 <FileUploadList>
-                  <FileUploadItem value={field.value}>
-                    <div className="flex items-center gap-3 p-2 border border-border rounded-xl bg-card w-full">
+                  <FileUploadItem value={field.value} className="p-0">
+                    <div className="flex items-center gap-3 p-2 rounded-xl bg-card w-full">
                       <FileUploadItemPreview className="w-12 h-12 rounded-lg object-cover shrink-0" />
                       <FileUploadItemMetadata className="flex-1 min-w-0 text-sm" />
                       <FileUploadItemDelete asChild>
@@ -173,7 +171,7 @@ const MessCreationForm = () => {
           type="button"
           variant="outline"
           className="flex-1 active:scale-[0.96] rounded-xl h-11"
-          onClick={() => router.push("/onboard")}
+          onClick={() => router.back()}
           disabled={isSubmitting}
         >
           Cancel

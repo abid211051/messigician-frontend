@@ -1,7 +1,7 @@
 export type AuthUser = {
   id: string;
   email: string;
-  role: string;
+  mess_id: string;
   mess_role: "owner" | "manager" | "member" | null;
 };
 

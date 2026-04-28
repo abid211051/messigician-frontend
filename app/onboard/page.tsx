@@ -52,9 +52,9 @@ const LINK_BUTTON = [
 export default function OnboardingPage() {
   return (
     <div
-      className={`min-h-screen flex flex-col justify-center items-center ${SYSTEM_WIDE_PADDING} bg-background`}
+      className={`min-h-screen flex flex-col justify-center items-center ${SYSTEM_WIDE_PADDING}`}
     >
-      <div className="flex items-center justify-center w-30 h-30 rounded-3xl bg-brand-primary-muted border border-brand-primary-border mb-2">
+      <div className="flex items-center justify-center w-30 h-30 rounded-3xl bg-card border border-brand-primary-border mb-2">
         <MessigicianLogo />
       </div>
 
