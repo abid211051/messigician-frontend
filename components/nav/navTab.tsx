@@ -60,7 +60,7 @@ export default function NavTabs() {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full border-t bg-card">
+    <nav className="z-999 fixed bottom-0 left-0 w-full border-t bg-card">
       <ul className="grid grid-cols-4">
         {mainTabs.map((tab) => {
           const Icon = tab.icon;

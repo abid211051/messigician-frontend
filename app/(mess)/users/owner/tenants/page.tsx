@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import BackButton from "@/components/ui/back";
 import { SYSTEM_WIDE_PADDING } from "@/lib/constants";
 import TenantsClient from "./tenants-client";
+import ListLoading from "@/components/ui/ListLoading";
 
 export default function OwnerTenantsPage() {
   return (
@@ -9,7 +11,17 @@ export default function OwnerTenantsPage() {
         <BackButton />
         <h1 className="text-lg font-bold text-gray-900">Tenants</h1>
       </div>
-      <TenantsClient />
+      <Suspense
+        fallback={
+          <div className="flex flex-col gap-3">
+            {[...Array(5)].map((_, i) => (
+              <ListLoading key={i} />
+            ))}
+          </div>
+        }
+      >
+        <TenantsClient />
+      </Suspense>
     </div>
   );
 }

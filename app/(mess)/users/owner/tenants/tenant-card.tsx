@@ -40,7 +40,7 @@ export default function TenantCard({
   return (
     <div
       className={`rounded-xl border bg-white transition-colors overflow-hidden ${
-        isSelected ? "border-blue-400 bg-blue-50/30" : "border-gray-200"
+        isSelected ? "border-brand-primary/70" : "border-gray-200"
       }`}
     >
       <div className="p-3">
@@ -83,6 +83,7 @@ export default function TenantCard({
           {/* Checkbox — top right */}
           <div className="shrink-0 pt-0.5">
             <Checkbox
+              className="border-brand-secondary/50"
               checked={isSelected}
               onCheckedChange={onSelect}
               aria-label={`Select ${tenant.fname}`}
