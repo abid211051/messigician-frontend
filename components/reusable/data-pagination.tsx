@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Ellipsis } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface DataPaginationProps {
@@ -29,14 +29,11 @@ export default function DataPagination({
     if (totalPages <= 3) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-    // At first page: no left ellipsis, current IS 1
-    if (currentPage === 1) {
+    // At first page: no left ellipsis, current IS 1 and At last page: no right ellipsis, current IS n
+    if (currentPage === 1 || currentPage === totalPages) {
       return [1, "...", totalPages];
     }
-    // At last page: no right ellipsis, current IS n
-    if (currentPage === totalPages) {
-      return [1, "...", totalPages];
-    }
+
     // Adjacent to first: show 1 and 2 together, no left ellipsis
     if (currentPage === 2) {
       return [1, 2, "...", totalPages];
@@ -70,9 +67,9 @@ export default function DataPagination({
           page === "..." ? (
             <span
               key={`e${i}`}
-              className="px-0.5 text-xs text-gray-400 select-none"
+              className="px-0.5 text-xs text-muted-foreground/90 select-none"
             >
-              …
+              <Ellipsis className="h-3 w-3" />
             </span>
           ) : (
             <button
@@ -81,8 +78,8 @@ export default function DataPagination({
               disabled={isLoading}
               className={`h-7 min-w-[28px] px-1.5 rounded-md text-xs font-medium transition-colors ${
                 page === currentPage
-                  ? "bg-blue-500 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-brand-primary text-white"
+                  : "text-muted-foreground/90 hover:bg-gray-100"
               }`}
             >
               {page}

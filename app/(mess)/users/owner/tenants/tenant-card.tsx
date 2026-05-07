@@ -48,25 +48,25 @@ export default function TenantCard({
         <div className="flex items-start gap-2.5">
           {/* Avatar */}
           <div
-            className={`w-9 h-9 rounded-lg ${getAvatarColor(tenant.fname)} flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden`}
+            className={`w-9 h-9 rounded-lg ${getAvatarColor(tenant.tenant_name)} flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden`}
           >
-            {tenant.image_url ? (
+            {tenant.images ? (
               <Image
-                src={tenant.image_url}
-                alt={tenant.fname}
+                src={tenant.images[0].url}
+                alt={tenant.tenant_name}
                 width={36}
                 height={36}
                 className="w-full h-full object-cover"
               />
             ) : (
-              getInitials(tenant.fname)
+              getInitials(tenant.tenant_name)
             )}
           </div>
 
           {/* Name + phone + email */}
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-gray-900 leading-tight truncate">
-              {tenant.fname}
+              {tenant.tenant_name}
             </p>
             {tenant.phone && (
               <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
@@ -86,7 +86,7 @@ export default function TenantCard({
               className="border-brand-secondary/50"
               checked={isSelected}
               onCheckedChange={onSelect}
-              aria-label={`Select ${tenant.fname}`}
+              aria-label={`Select ${tenant.tenant_name}`}
             />
           </div>
         </div>
@@ -102,7 +102,8 @@ export default function TenantCard({
             <div className="flex items-center gap-1 text-brand-primary">
               <Banknote className="w-3.5 h-3.5" />
               <span className="font-bold text-sm">
-                ৳{tenant.rent_amount.toLocaleString()}
+                ৳5000
+                {/* ৳{tenant.rent_amount.toLocaleString()} */}
               </span>
             </div>
 

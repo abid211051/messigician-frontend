@@ -6,6 +6,7 @@ import {
   DrawerTrigger,
   DrawerContent,
   DrawerTitle,
+  DrawerDescription,
 } from "@/components/ui/drawer";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import Link from "next/link";
@@ -42,9 +43,17 @@ const getTabConfig = (messId: string) => ({
   },
 });
 
+const gridColsMap: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+  5: "grid-cols-5",
+};
+
 const tabItemClass = (active: boolean) =>
   `flex flex-col items-center justify-center gap-0.5 h-16 px-1 w-full active:scale-95 transition-transform
-   ${active ? "text-brand-primary border-t-2 border-t-brand-primary" : ""}`;
+${active ? "text-brand-primary border-t-2 border-t-brand-primary" : ""}`;
 
 export default function NavTabs() {
   const user = useAuthStore((s) => s.user);
@@ -60,8 +69,10 @@ export default function NavTabs() {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <nav className="z-999 fixed bottom-0 left-0 w-full border-t bg-card">
-      <ul className="grid grid-cols-4">
+    <nav className="z-20 fixed bottom-0 left-0 w-full border-t bg-card">
+      <ul
+        className={`grid ${gridColsMap[mainTabs.length + 1] || "grid-cols-2"}`}
+      >
         {mainTabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -79,12 +90,13 @@ export default function NavTabs() {
         })}
 
         <Drawer>
-          <DrawerTrigger className={tabItemClass(false)}>
+          <DrawerTrigger className={`${tabItemClass(false)}`}>
             <Menu className="w-5 h-5 shrink-0" />
             <span className="text-[11px] text-center">More</span>
           </DrawerTrigger>
           <DrawerContent className="bg-card rounded-t-2xl">
-            <DrawerTitle aria-describedby="more" />
+            <DrawerTitle />
+            <DrawerDescription />
             <div className="grid grid-cols-4 py-2">
               {moreTabs.map((tab) => {
                 const Icon = tab.icon;

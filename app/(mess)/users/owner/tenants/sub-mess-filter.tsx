@@ -19,7 +19,7 @@ export default function SubMessFilter({
 }: SubMessFilterProps) {
   const options: FilterOption[] = subMesses.map((sm) => ({
     id: sm.id,
-    label: sm.name,
+    label: sm.sub_mess_name,
   }));
 
   return (

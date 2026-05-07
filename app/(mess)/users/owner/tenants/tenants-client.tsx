@@ -11,160 +11,25 @@ import ConfirmDialog from "@/components/reusable/confirm-dialog";
 import DataPagination from "@/components/reusable/data-pagination";
 import { TenantData, SubMessOption } from "./types";
 import { Button } from "@/components/ui/button";
+import { fetchTenants, fetchSubMesses } from "./tenants.action";
+import { handleApiError } from "@/lib/helpers/errors";
 
-const PAGE_SIZE = 5;
-
-// ─── URL param keys (single source of truth) ────────────────────────────────
+const PAGE_SIZE = 10;
 const PARAM_PAGE = "page";
-const PARAM_SUB_MESS = "sub_mess"; // comma-separated IDs
+const PARAM_SUB_MESS = "sub_mess";
 
-// ─── Data layer ─────────────────────────────────────────────────────────────
-// All fetch logic is isolated here. To move to a real backend:
-//   1. Replace the body of this function with an actual fetch() call.
-//   2. Pass `page` and `subMessIds` to the API as query params.
-//   3. Return `{ tenants, subMesses, totalItems }` from the API response.
-//   4. Remove the local filter/slice below — the server does that.
-interface FetchParams {
-  messId: string | undefined;
-  page: number;
-  pageSize: number;
-  subMessIds: Set<string>;
-}
-
-interface FetchResult {
-  tenants: TenantData[];
-  subMesses: SubMessOption[];
-  totalItems: number;
-}
-
-async function fetchTenants({
-  messId, // eslint-disable-line @typescript-eslint/no-unused-vars
-  page,
-  pageSize,
-  subMessIds,
-}: FetchParams): Promise<FetchResult> {
-  // ── MOCK (replace this block with a real fetch) ──────────────────────────
-  await new Promise((r) => setTimeout(r, 400));
-
-  const allSubMesses: SubMessOption[] = [
-    { id: "1", name: "Block-1" },
-    { id: "2", name: "Block-2" },
-    { id: "3", name: "Building A" },
-  ];
-
-  const allTenants: TenantData[] = [
-    {
-      id: "1",
-      user_id: "u1",
-      fname: "John Doe",
-      email: "john@example.com",
-      phone: "+880123456789",
-      sub_mess_id: "1",
-      sub_mess_name: "Block-1",
-      rent_amount: 5000,
-      image_url: null,
-    },
-    {
-      id: "2",
-      user_id: "u2",
-      fname: "Jane Smith",
-      email: "jane@example.com",
-      phone: null,
-      sub_mess_id: "2",
-      sub_mess_name: "Block-2",
-      rent_amount: 6500,
-      image_url: null,
-    },
-    {
-      id: "3",
-      user_id: "u3",
-      fname: "Mike Johnson",
-      email: "mike@example.com",
-      phone: "+880555666777",
-      sub_mess_id: "1",
-      sub_mess_name: "Block-1",
-      rent_amount: 4500,
-      image_url: null,
-    },
-    {
-      id: "4",
-      user_id: "u4",
-      fname: "Sara Ahmed",
-      email: "sara@example.com",
-      phone: "+880111222333",
-      sub_mess_id: "2",
-      sub_mess_name: "Block-2",
-      rent_amount: 5500,
-      image_url: null,
-    },
-    {
-      id: "5",
-      user_id: "u5",
-      fname: "Rafiq Islam",
-      email: "rafiq@example.com",
-      phone: "+880444555666",
-      sub_mess_id: "3",
-      sub_mess_name: "Building A",
-      rent_amount: 7000,
-      image_url: null,
-    },
-    {
-      id: "6",
-      user_id: "u6",
-      fname: "Nadia Begum",
-      email: "nadia@example.com",
-      phone: null,
-      sub_mess_id: "1",
-      sub_mess_name: "Block-1",
-      rent_amount: 4800,
-      image_url: null,
-    },
-    {
-      id: "7",
-      user_id: "u7",
-      fname: "Karim Uddin",
-      email: "karim@example.com",
-      phone: "+880777888999",
-      sub_mess_id: "3",
-      sub_mess_name: "Building A",
-      rent_amount: 6200,
-      image_url: null,
-    },
-  ];
-
-  // Mock server-side filter + pagination
-  const filtered =
-    subMessIds.size === 0
-      ? allTenants
-      : allTenants.filter((t) => subMessIds.has(t.sub_mess_id));
-
-  const totalItems = filtered.length;
-  const tenants = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  return { tenants, subMesses: allSubMesses, totalItems };
-  // ── END MOCK ─────────────────────────────────────────────────────────────
-}
-
-// ─── URL helpers ─────────────────────────────────────────────────────────────
 function parseUrlState(searchParams: URLSearchParams) {
   const rawPage = parseInt(searchParams.get(PARAM_PAGE) ?? "1", 10);
   const page = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
-
   const rawSubMess = searchParams.get(PARAM_SUB_MESS);
   const subMessIds = rawSubMess
     ? new Set(rawSubMess.split(",").filter(Boolean))
     : new Set<string>();
-
   return { page, subMessIds };
 }
 
-function buildUrl(
-  pathname: string,
-  page: number,
-  subMessIds: Set<string>,
-): string {
+function buildUrl(pathname: string, page: number, subMessIds: Set<string>) {
   const params = new URLSearchParams();
-  // Only write non-default values to keep URL clean
   if (page > 1) params.set(PARAM_PAGE, String(page));
   if (subMessIds.size > 0)
     params.set(PARAM_SUB_MESS, [...subMessIds].join(","));
@@ -172,14 +37,12 @@ function buildUrl(
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
 export default function TenantsClient() {
-  const messId = useAuthStore((s) => s.user?.mess_id);
+  const mess_id = useAuthStore((s) => s.user?.mess_id);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Boot state directly from URL — no two sources of truth
   const { page: initialPage, subMessIds: initialSubMess } =
     parseUrlState(searchParams);
 
@@ -190,50 +53,74 @@ export default function TenantsClient() {
   const [tenants, setTenants] = useState<TenantData[]>([]);
   const [subMesses, setSubMesses] = useState<SubMessOption[]>([]);
   const [totalItems, setTotalItems] = useState(0);
-  const [isLoading, startLoading] = useTransition();
+  const [subMessFetchFailed, setSubMessFetchFailed] = useState(false);
 
+  const [isLoading, startLoading] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ── Single fetch trigger — called whenever page or filter changes ──────────
-  const loadData = useCallback(
-    (page: number, subMessIds: Set<string>) => {
+  // Only fetches tenants — called on page/filter changes after init
+  const loadTenants = useCallback(
+    (page: number, sub_mess_ids: Set<string>) => {
+      if (!mess_id) return;
       startLoading(async () => {
-        const data = await fetchTenants({
-          messId,
-          page,
-          pageSize: PAGE_SIZE,
-          subMessIds,
-        });
-        setTenants(data.tenants);
-        setSubMesses(data.subMesses);
-        setTotalItems(data.totalItems);
-        // Clear selections when data changes
-        setSelectedIds(new Set());
+        try {
+          const result = await fetchTenants({ mess_id, page, sub_mess_ids });
+          setTenants(result.data);
+          setTotalItems(result.meta.totalItems);
+          setCurrentPage(result.meta.currentPage);
+          setSelectedIds(new Set());
+        } catch (error) {
+          handleApiError(error);
+          setTenants([]);
+          setTotalItems(0);
+        }
       });
     },
-    [messId],
+    [mess_id],
   );
 
-  // Initial load
+  // Initial load: sub-messes first, tenants only if sub-messes exist
   useEffect(() => {
-    loadData(initialPage, initialSubMess);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!mess_id) return;
+    startLoading(async () => {
+      try {
+        const subMessData = await fetchSubMesses(mess_id);
 
-  // ── State + URL change helpers ────────────────────────────────────────────
-  // Single function that always keeps state, URL, and data in sync
+        if (!subMessData.length) {
+          // No sub-messes → don't bother fetching tenants
+          setSubMesses([]);
+          return;
+        }
+
+        setSubMesses(subMessData);
+
+        const result = await fetchTenants({
+          mess_id,
+          page: initialPage,
+          sub_mess_ids: initialSubMess,
+        });
+        setTenants(result.data);
+        setTotalItems(result.meta.totalItems);
+        setCurrentPage(result.meta.currentPage);
+      } catch (error) {
+        handleApiError(error);
+        setSubMessFetchFailed(true);
+      }
+    });
+  }, [mess_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ↑ intentionally omit initialPage/initialSubMess — boot once from URL snapshot
+
   const applyChange = useCallback(
     (nextPage: number, nextSubMess: Set<string>) => {
-      setCurrentPage(nextPage);
       setFilteredSubMesses(nextSubMess);
       router.replace(buildUrl(pathname, nextPage, nextSubMess), {
         scroll: false,
       });
-      loadData(nextPage, nextSubMess);
+      loadTenants(nextPage, nextSubMess);
     },
-    [router, pathname, loadData],
+    [router, pathname, loadTenants],
   );
 
   const handlePageChange = (page: number) =>
@@ -242,12 +129,12 @@ export default function TenantsClient() {
   const handleToggleSubMess = (id: string) => {
     const next = new Set(filteredSubMesses);
     next.has(id) ? next.delete(id) : next.add(id);
-    applyChange(1, next); // always reset to page 1 on filter change
+    applyChange(1, next);
   };
 
   const handleClearFilter = () => applyChange(1, new Set());
 
-  // ── Selection ─────────────────────────────────────────────────────────────
+  // ── Selection ──────────────────────────────────────────────────────────────
   const allSelected =
     tenants.length > 0 && tenants.every((t) => selectedIds.has(t.id));
   const someSelected = tenants.some((t) => selectedIds.has(t.id));
@@ -268,7 +155,7 @@ export default function TenantsClient() {
     setSelectedIds(next);
   };
 
-  // ── Delete ────────────────────────────────────────────────────────────────
+  // ── Delete ─────────────────────────────────────────────────────────────────
   const handleBulkDelete = async () => {
     setIsDeleting(true);
     try {
@@ -276,8 +163,7 @@ export default function TenantsClient() {
       await new Promise((r) => setTimeout(r, 700));
       setConfirmOpen(false);
       setSelectedIds(new Set());
-      // Reload current page — item count may have changed
-      loadData(currentPage, filteredSubMesses);
+      loadTenants(currentPage, filteredSubMesses);
     } catch (e) {
       console.error(e);
     } finally {
@@ -285,20 +171,37 @@ export default function TenantsClient() {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  if (isLoading && tenants.length === 0) {
+  // ── Derived empty states ───────────────────────────────────────────────────
+  if (isLoading && subMesses.length === 0 && !subMessFetchFailed) {
     return (
       <div className="flex flex-col gap-3">
-        {[...Array(PAGE_SIZE)].map((_, i) => (
+        {[...Array(5)].map((_, i) => (
           <ListLoading key={i} />
         ))}
       </div>
     );
   }
 
+  if (subMessFetchFailed || (!isLoading && subMesses.length === 0)) {
+    return (
+      <div className="text-center py-16">
+        <Users className="w-14 h-14 mx-auto text-gray-200 mb-3" />
+        <p className="font-semibold text-gray-700 mb-1">
+          {subMessFetchFailed
+            ? "Failed to load sub-messes"
+            : "No sub-messes found"}
+        </p>
+        <p className="text-sm text-gray-400">
+          {subMessFetchFailed
+            ? "Please check your connection and try again"
+            : "Add a sub-mess to get started"}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Filter */}
       <div className="mb-3">
         <SubMessFilter
           subMesses={subMesses}
@@ -308,7 +211,13 @@ export default function TenantsClient() {
         />
       </div>
 
-      {!isLoading && totalItems === 0 ? (
+      {isLoading && tenants.length === 0 ? (
+        <div className="flex flex-col gap-3">
+          {[...Array(5)].map((_, i) => (
+            <ListLoading key={i} />
+          ))}
+        </div>
+      ) : !isLoading && totalItems === 0 ? (
         <div className="text-center py-16">
           <Users className="w-14 h-14 mx-auto text-gray-200 mb-3" />
           <p className="font-semibold text-gray-700 mb-1">No tenants found</p>
@@ -320,7 +229,6 @@ export default function TenantsClient() {
         </div>
       ) : (
         <>
-          {/* Select-all bar */}
           <div className="min-h-7 flex items-center justify-between mb-2 px-0.5">
             <button
               onClick={handleSelectAll}
@@ -363,7 +271,6 @@ export default function TenantsClient() {
             )}
           </div>
 
-          {/* Cards — dim during reload */}
           <div
             className={`space-y-2.5 transition-opacity ${isLoading ? "opacity-50 pointer-events-none" : ""}`}
           >
@@ -374,12 +281,11 @@ export default function TenantsClient() {
                 isSelected={selectedIds.has(tenant.id)}
                 onSelect={(checked) => handleSelectOne(tenant.id, checked)}
                 onEdit={(id) => console.log("Edit", id)}
-                onDelete={(id) => console.log("Delete", id)}
+                onDelete={() => setConfirmOpen(true)}
               />
             ))}
           </div>
 
-          {/* Pagination */}
           <DataPagination
             currentPage={currentPage}
             totalItems={totalItems}
@@ -394,9 +300,9 @@ export default function TenantsClient() {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title={`Delete ${selectedIds.size} tenant${selectedIds.size !== 1 ? "s" : ""}?`}
-        description="This will permanently remove the selected tenants. This action cannot be undone."
+        description="Are you confirm to delete?"
         confirmLabel="Delete"
-        cancelLabel="Keep"
+        cancelLabel="Cancel"
         variant="destructive"
         isLoading={isDeleting}
         onConfirm={handleBulkDelete}
