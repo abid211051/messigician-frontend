@@ -26,9 +26,11 @@ interface TenantCardProps {
   tenant: TenantData;
   isSelected: boolean;
   onSelect: (checked: boolean) => void;
-  onEdit: (id: string) => void;
+  onEdit: (tenant: TenantData) => void;
   onDelete: (id: string) => void;
 }
+
+// and the menu item:
 
 export default function TenantCard({
   tenant,
@@ -48,35 +50,35 @@ export default function TenantCard({
         <div className="flex items-start gap-2.5">
           {/* Avatar */}
           <div
-            className={`w-9 h-9 rounded-lg ${getAvatarColor(tenant.tenant_name)} flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden`}
+            className={`w-9 h-9 rounded-lg ${getAvatarColor(tenant?.tenant_name)} flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden`}
           >
-            {tenant.images ? (
+            {tenant?.images ? (
               <Image
-                src={tenant.images[0].url}
-                alt={tenant.tenant_name}
+                src={tenant?.images[0]?.url}
+                alt={tenant?.tenant_name}
                 width={36}
                 height={36}
                 className="w-full h-full object-cover"
               />
             ) : (
-              getInitials(tenant.tenant_name)
+              getInitials(tenant?.tenant_name)
             )}
           </div>
 
           {/* Name + phone + email */}
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-gray-900 leading-tight truncate">
-              {tenant.tenant_name}
+              {tenant?.tenant_name}
             </p>
-            {tenant.phone && (
+            {tenant?.phone && (
               <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                 <Phone className="w-3 h-3 shrink-0" />
-                <span className="truncate">{tenant.phone}</span>
+                <span className="truncate">{tenant?.phone}</span>
               </div>
             )}
             <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
               <Mail className="w-3 h-3 shrink-0" />
-              <span className="truncate">{tenant.email}</span>
+              <span className="truncate">{tenant?.email}</span>
             </div>
           </div>
 
@@ -86,7 +88,7 @@ export default function TenantCard({
               className="border-brand-secondary/50"
               checked={isSelected}
               onCheckedChange={onSelect}
-              aria-label={`Select ${tenant.tenant_name}`}
+              aria-label={`Select ${tenant?.tenant_name}`}
             />
           </div>
         </div>
@@ -95,15 +97,18 @@ export default function TenantCard({
         <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-gray-100">
           <div className="flex items-center gap-1 text-xs text-gray-500 min-w-0 mr-2">
             <Building2 className="w-3 h-3 shrink-0" />
-            <span className="font-medium truncate">{tenant.sub_mess_name}</span>
+            <span className="font-medium truncate">
+              {tenant?.sub_mess_name}
+            </span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
             <div className="flex items-center gap-1 text-brand-primary">
-              <Banknote className="w-3.5 h-3.5" />
-              <span className="font-bold text-sm">
-                ৳5000
-                {/* ৳{tenant.rent_amount.toLocaleString()} */}
+              {/* <Banknote className="w-3.5 h-3.5" /> */}
+              <span
+                className={`font-bold ${tenant?.total_due > 0 ? "text-brand-secondary" : "text-danger"} text-sm`}
+              >
+                {"৳ "} {tenant?.total_due ?? 0}
               </span>
             </div>
 
@@ -113,24 +118,24 @@ export default function TenantCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-gray-400 hover:text-gray-600 -mr-1"
+                  className="h-6 w-6 text-gray-500 hover:text-gray-600 -mr-1"
                 >
                   <MoreVertical className="h-3.5 w-3.5" />
                   <span className="sr-only">Actions</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-36">
-                <DropdownMenuItem onClick={() => onEdit(tenant.id)}>
-                  <Pencil className="w-3.5 h-3.5 mr-2 text-gray-500" />
-                  Edit
+                <DropdownMenuItem onClick={() => onEdit(tenant)}>
+                  <Pencil className="w-3.5 h-3.5 mr-2 text-gray-700" />
+                  <span>Edit</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onDelete(tenant.id)}
+                  onClick={() => onDelete(tenant?.id)}
                   className="text-red-600 focus:text-red-600 focus:bg-red-50"
                 >
                   <Trash2 className="w-3.5 h-3.5 mr-2" />
-                  Delete
+                  <span>Delete</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

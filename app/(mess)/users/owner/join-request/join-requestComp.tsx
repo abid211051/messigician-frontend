@@ -45,7 +45,7 @@ export default function JoinRequestsClient() {
 
   useEffect(() => {
     fetchRequests();
-  }, [fetchRequests]);
+  }, [messId]);
 
   const handleAccept = async (payload: AcceptData) => {
     setIsAccepting(payload.request_id);

@@ -16,10 +16,4 @@ export const createMessSchema = z.object({
   file: imageFileSchema.optional(),
 });
 
-export const joinMessSchema = z.object({
-  mess_id: z.uuid({ message: "Invalid Mess ID format" }),
-  sub_mess_id: z.uuid({ message: "Invalid Sub-mess ID format" }),
-});
-
-export type JoinMessFormValues = z.infer<typeof joinMessSchema>;
 export type CreateMessFormValues = z.infer<typeof createMessSchema>;

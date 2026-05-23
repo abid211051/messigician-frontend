@@ -1,4 +1,4 @@
-import MessJoinForm from "@/components/messForms/messJoinFrom";
+import MessJoinForm from "@/app/onboard/join/messJoinFrom";
 import { SYSTEM_WIDE_PADDING } from "@/lib/constants";
 import MessigicianLogo from "@/components/svg/messigicianLogo";
 

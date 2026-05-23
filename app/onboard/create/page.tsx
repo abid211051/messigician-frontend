@@ -1,4 +1,4 @@
-import MessCreationForm from "@/components/messForms/messCreateForm";
+import MessCreationForm from "@/app/onboard/create/messCreateForm";
 import { SYSTEM_WIDE_PADDING } from "@/lib/constants";
 import MessigicianLogo from "@/components/svg/messigicianLogo";
 

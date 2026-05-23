@@ -1,6 +1,11 @@
 import axios from "axios";
 import { toast } from "sonner";
 
+export interface ErrorArray {
+  message?: string;
+  field?: string;
+}
+
 const toastDisplay = (errMsg: string) => {
   toast.error(errMsg, { richColors: true, position: "top-center" });
 };

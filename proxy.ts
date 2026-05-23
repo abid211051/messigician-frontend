@@ -9,7 +9,8 @@ const ROLE_BASED_ROUTES = {
   member: "/users/member",
 } as const;
 
-const isPrivate = (path: string) => path.startsWith("/users");
+const isPrivate = (path: string) =>
+  path.startsWith("/users") || path.startsWith("/onboard");
 
 async function verifyAccessToken(token: string) {
   try {

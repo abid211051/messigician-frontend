@@ -8,11 +8,18 @@ import TenantCard from "./tenant-card";
 import SubMessFilter from "./sub-mess-filter";
 import ListLoading from "@/components/ui/ListLoading";
 import ConfirmDialog from "@/components/reusable/confirm-dialog";
+import EditTenantDialog from "./tenant-edit-dialog";
 import DataPagination from "@/components/reusable/data-pagination";
 import { TenantData, SubMessOption } from "./types";
 import { Button } from "@/components/ui/button";
-import { fetchTenants, fetchSubMesses } from "./tenants.action";
+import {
+  fetchTenants,
+  fetchSubMesses,
+  deleteTenants,
+  updateTenant,
+} from "./action";
 import { handleApiError } from "@/lib/helpers/errors";
+import { EditTenantFormValues } from "./validation";
 
 const PAGE_SIZE = 10;
 const PARAM_PAGE = "page";
@@ -57,19 +64,27 @@ export default function TenantsClient() {
 
   const [isLoading, startLoading] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // ── Delete state ───────────────────────────────────────────────────────────
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Only fetches tenants — called on page/filter changes after init
+  // ── Edit state ─────────────────────────────────────────────────────────────
+  const [editOpen, setEditOpen] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<TenantData | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // ── Data loading ───────────────────────────────────────────────────────────
   const loadTenants = useCallback(
     (page: number, sub_mess_ids: Set<string>) => {
       if (!mess_id) return;
       startLoading(async () => {
         try {
           const result = await fetchTenants({ mess_id, page, sub_mess_ids });
-          setTenants(result.data);
-          setTotalItems(result.meta.totalItems);
-          setCurrentPage(result.meta.currentPage);
+          setTenants(result.data || []);
+          setTotalItems(result.meta?.totalItems || 0);
+          setCurrentPage(result.meta?.currentPage || page);
           setSelectedIds(new Set());
         } catch (error) {
           handleApiError(error);
@@ -88,8 +103,7 @@ export default function TenantsClient() {
       try {
         const subMessData = await fetchSubMesses(mess_id);
 
-        if (!subMessData.length) {
-          // No sub-messes → don't bother fetching tenants
+        if (!subMessData || !subMessData.length) {
           setSubMesses([]);
           return;
         }
@@ -101,17 +115,17 @@ export default function TenantsClient() {
           page: initialPage,
           sub_mess_ids: initialSubMess,
         });
-        setTenants(result.data);
-        setTotalItems(result.meta.totalItems);
-        setCurrentPage(result.meta.currentPage);
+        setTenants(result.data || []);
+        setTotalItems(result.meta?.totalItems || 0);
+        setCurrentPage(result.meta?.currentPage || initialPage);
       } catch (error) {
         handleApiError(error);
         setSubMessFetchFailed(true);
       }
     });
   }, [mess_id]); // eslint-disable-line react-hooks/exhaustive-deps
-  // ↑ intentionally omit initialPage/initialSubMess — boot once from URL snapshot
 
+  // ── URL + filter + page sync ───────────────────────────────────────────────
   const applyChange = useCallback(
     (nextPage: number, nextSubMess: Set<string>) => {
       setFilteredSubMesses(nextSubMess);
@@ -156,23 +170,57 @@ export default function TenantsClient() {
   };
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  const handleBulkDelete = async () => {
+  const handleBulkDeleteClick = () => {
+    setPendingDelete(new Set(selectedIds));
+    setConfirmOpen(true);
+  };
+
+  const handleSingleDeleteClick = (id: string) => {
+    setPendingDelete(new Set([id]));
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (pendingDelete.size === 0) return;
     setIsDeleting(true);
     try {
-      // TODO: await deleteTenantsApi(Array.from(selectedIds));
-      await new Promise((r) => setTimeout(r, 700));
+      await deleteTenants(pendingDelete);
       setConfirmOpen(false);
+      setPendingDelete(new Set());
       setSelectedIds(new Set());
       loadTenants(currentPage, filteredSubMesses);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      handleApiError(error);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // ── Derived empty states ───────────────────────────────────────────────────
-  if (isLoading && subMesses.length === 0 && !subMessFetchFailed) {
+  // ── Edit ───────────────────────────────────────────────────────────────────
+  const handleEditClick = (tenant: TenantData) => {
+    setPendingEdit(tenant);
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async (id: string, values: EditTenantFormValues) => {
+    setIsSaving(true);
+    try {
+      await updateTenant(id, values);
+      setEditOpen(false);
+      setPendingEdit(null);
+      loadTenants(currentPage, filteredSubMesses);
+    } catch (error) {
+      handleApiError(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ── Render guards ──────────────────────────────────────────────────────────
+  if (
+    !mess_id ||
+    (isLoading && subMesses.length === 0 && !subMessFetchFailed)
+  ) {
     return (
       <div className="flex flex-col gap-3">
         {[...Array(5)].map((_, i) => (
@@ -182,7 +230,7 @@ export default function TenantsClient() {
     );
   }
 
-  if (subMessFetchFailed || (!isLoading && subMesses.length === 0)) {
+  if (subMessFetchFailed || (!isLoading && mess_id && subMesses.length === 0)) {
     return (
       <div className="text-center py-16">
         <Users className="w-14 h-14 mx-auto text-gray-200 mb-3" />
@@ -229,6 +277,7 @@ export default function TenantsClient() {
         </div>
       ) : (
         <>
+          {/* Select-all bar */}
           <div className="min-h-7 flex items-center justify-between mb-2 px-0.5">
             <button
               onClick={handleSelectAll}
@@ -262,7 +311,7 @@ export default function TenantsClient() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => setConfirmOpen(true)}
+                onClick={handleBulkDeleteClick}
                 className="h-7 text-xs px-3 gap-1.5"
               >
                 <Trash2 className="w-3 h-3" />
@@ -271,6 +320,7 @@ export default function TenantsClient() {
             )}
           </div>
 
+          {/* Cards */}
           <div
             className={`space-y-2.5 transition-opacity ${isLoading ? "opacity-50 pointer-events-none" : ""}`}
           >
@@ -280,8 +330,8 @@ export default function TenantsClient() {
                 tenant={tenant}
                 isSelected={selectedIds.has(tenant.id)}
                 onSelect={(checked) => handleSelectOne(tenant.id, checked)}
-                onEdit={(id) => console.log("Edit", id)}
-                onDelete={() => setConfirmOpen(true)}
+                onEdit={handleEditClick}
+                onDelete={handleSingleDeleteClick}
               />
             ))}
           </div>
@@ -299,13 +349,21 @@ export default function TenantsClient() {
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Delete ${selectedIds.size} tenant${selectedIds.size !== 1 ? "s" : ""}?`}
-        description="Are you confirm to delete?"
+        title={`Delete ${pendingDelete.size} tenant${pendingDelete.size !== 1 ? "s" : ""}?`}
+        description="This action cannot be undone. Are you sure you want to proceed?"
         confirmLabel="Delete"
         cancelLabel="Cancel"
         variant="destructive"
         isLoading={isDeleting}
-        onConfirm={handleBulkDelete}
+        onConfirm={handleConfirmDelete}
+      />
+      <EditTenantDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        tenant={pendingEdit}
+        subMesses={subMesses}
+        isLoading={isSaving}
+        onSave={handleSaveEdit}
       />
     </>
   );

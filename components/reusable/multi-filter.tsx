@@ -53,14 +53,14 @@ export default function MultiFilter({
               {count}
             </Badge>
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
           )}
         </button>
       </PopoverTrigger>
 
       <PopoverContent align="start" className="w-52 p-1.5">
         {/* Label */}
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide px-2 pb-1.5 pt-0.5">
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 pb-1.5 pt-0.5">
           {label}
         </p>
 

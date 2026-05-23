@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload, X, UtensilsCrossed, ArrowLeft } from "lucide-react";
+import { Upload, X, UtensilsCrossed } from "lucide-react";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -20,11 +20,11 @@ import {
 import {
   createMessSchema,
   type CreateMessFormValues,
-} from "@/lib/validations/mess.validation";
-import { messCreationApi } from "@/app/onboard/actions/onboard.action";
+} from "@/app/onboard/create/validation";
+import { messCreationApi } from "@/app/onboard/create/action";
 import { toast } from "sonner";
-import { AxiosError } from "axios";
 import { useRouter } from "next/navigation";
+import { handleApiError } from "@/lib/helpers/errors";
 
 const MessCreationForm = () => {
   const router = useRouter();
@@ -51,12 +51,7 @@ const MessCreationForm = () => {
         router.push("/users/owner");
       }, 3000);
     } catch (err) {
-      if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.message ?? "Something went wrong", {
-          position: "top-center",
-          richColors: true,
-        });
-      }
+      handleApiError(err);
     }
   };
 

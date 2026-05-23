@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   joinMessSchema,
   JoinMessFormValues,
-} from "@/lib/validations/mess.validation";
+} from "@/app/onboard/join/validation";
 import { MessSearchResult } from "@/lib/types/onboard";
 
 import { Button } from "@/components/ui/button";
@@ -21,12 +21,13 @@ import {
 } from "@/components/ui/select";
 
 import { toast } from "sonner";
-import { AxiosError } from "axios";
+
 import { useRouter } from "next/navigation";
 import {
   searchSubMessListApi,
   joinRequestApi,
-} from "@/app/onboard/actions/onboard.action";
+} from "@/app/onboard/join/action";
+import { handleApiError } from "@/lib/helpers/errors";
 
 const MessJoinForm = () => {
   const router = useRouter();
@@ -84,12 +85,7 @@ const MessJoinForm = () => {
         });
       }
     } catch (err) {
-      if (err instanceof AxiosError) {
-        toast.error(
-          err.response?.data?.message ?? "No mess found with that ID",
-          { position: "top-center", richColors: true },
-        );
-      }
+      handleApiError(err);
     } finally {
       setIsSearching(false);
     }
@@ -111,12 +107,7 @@ const MessJoinForm = () => {
       });
       setIsSuccess(true);
     } catch (err) {
-      if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.message ?? "Something went wrong", {
-          position: "top-center",
-          richColors: true,
-        });
-      }
+      handleApiError(err);
     }
   };
 
@@ -220,11 +211,14 @@ const MessJoinForm = () => {
                   }
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                className="w-[--radix-select-trigger-width] max-h-60"
+              >
                 <SelectItem
                   value="placeholder"
                   disabled
-                  className="text-muted-foreground"
+                  className="text-muted-foreground py-2"
                 >
                   — Select a sub-mess —
                 </SelectItem>
