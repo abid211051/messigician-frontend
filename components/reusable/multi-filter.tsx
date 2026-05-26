@@ -58,13 +58,13 @@ export default function MultiFilter({
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-52 p-1.5">
+      <PopoverContent align="start" className="w-52 max-h-60 p-1.5">
         {/* Label */}
         <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 pb-1.5 pt-0.5">
           {label}
         </p>
 
-        <div className="space-y-0.5">
+        <div className="overflow-y-auto">
           {options.map((opt) => {
             const checked = selectedIds.has(opt.id);
             return (
@@ -96,13 +96,13 @@ export default function MultiFilter({
 
         {/* Clear */}
         {count > 0 && (
-          <div className="mt-1 pt-1.5 border-t border-gray-100">
+          <div className="pt-1.5 border-t border-gray-100">
             <button
               onClick={() => {
                 onClear();
                 setOpen(false);
               }}
-              className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-red-500 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-red-500 text-xs hover:bg-red-50 transition-colors"
             >
               <X className="w-3 h-3" />
               Clear filter

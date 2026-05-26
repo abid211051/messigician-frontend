@@ -6,7 +6,7 @@ import { Trash2, Users, Check } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import TenantCard from "./tenant-card";
 import SubMessFilter from "./sub-mess-filter";
-import ListLoading from "@/components/ui/ListLoading";
+import PageSkeleton from "@/components/reusable/loading-skeleton";
 import ConfirmDialog from "@/components/reusable/confirm-dialog";
 import EditTenantDialog from "./tenant-edit-dialog";
 import DataPagination from "@/components/reusable/data-pagination";
@@ -61,6 +61,8 @@ export default function TenantsClient() {
   const [subMesses, setSubMesses] = useState<SubMessOption[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [subMessFetchFailed, setSubMessFetchFailed] = useState(false);
+  // ── Tracks whether the very first fetch has resolved ──────────────────────
+  const [initialised, setInitialised] = useState(false);
 
   const [isLoading, startLoading] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -96,7 +98,7 @@ export default function TenantsClient() {
     [mess_id],
   );
 
-  // Initial load: sub-messes first, tenants only if sub-messes exist
+  // Initial load: sub-messes first, then tenants
   useEffect(() => {
     if (!mess_id) return;
     startLoading(async () => {
@@ -121,6 +123,8 @@ export default function TenantsClient() {
       } catch (error) {
         handleApiError(error);
         setSubMessFetchFailed(true);
+      } finally {
+        setInitialised(true); // ← always fires, even on error
       }
     });
   }, [mess_id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -216,21 +220,13 @@ export default function TenantsClient() {
     }
   };
 
-  // ── Render guards ──────────────────────────────────────────────────────────
-  if (
-    !mess_id ||
-    (isLoading && subMesses.length === 0 && !subMessFetchFailed)
-  ) {
-    return (
-      <div className="flex flex-col gap-3">
-        {[...Array(5)].map((_, i) => (
-          <ListLoading key={i} />
-        ))}
-      </div>
-    );
+  // ── Initial full-page skeleton (before first fetch resolves) ───────────────
+  if (!mess_id || !initialised) {
+    return <PageSkeleton count={10} />;
   }
 
-  if (subMessFetchFailed || (!isLoading && mess_id && subMesses.length === 0)) {
+  // ── Error / empty sub-mess states (full-page, no cards possible) ───────────
+  if (subMessFetchFailed || (!isLoading && subMesses.length === 0)) {
     return (
       <div className="text-center py-16">
         <Users className="w-14 h-14 mx-auto text-gray-200 mb-3" />
@@ -250,6 +246,7 @@ export default function TenantsClient() {
 
   return (
     <>
+      {/* Filter strip — always mounted after initialised */}
       <div className="mb-3">
         <SubMessFilter
           subMesses={subMesses}
@@ -259,13 +256,10 @@ export default function TenantsClient() {
         />
       </div>
 
-      {isLoading && tenants.length === 0 ? (
-        <div className="flex flex-col gap-3">
-          {[...Array(5)].map((_, i) => (
-            <ListLoading key={i} />
-          ))}
-        </div>
-      ) : !isLoading && totalItems === 0 ? (
+      {/* List area — only this reacts to subsequent loads */}
+      {isLoading ? (
+        <PageSkeleton count={10} />
+      ) : totalItems === 0 ? (
         <div className="text-center py-16">
           <Users className="w-14 h-14 mx-auto text-gray-200 mb-3" />
           <p className="font-semibold text-gray-700 mb-1">No tenants found</p>
@@ -321,9 +315,7 @@ export default function TenantsClient() {
           </div>
 
           {/* Cards */}
-          <div
-            className={`space-y-2.5 transition-opacity ${isLoading ? "opacity-50 pointer-events-none" : ""}`}
-          >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
             {tenants.map((tenant) => (
               <TenantCard
                 key={tenant.id}
