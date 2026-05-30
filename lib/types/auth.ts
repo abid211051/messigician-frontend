@@ -3,9 +3,11 @@ export type AuthUser = {
   email: string;
   mess_id: string;
   mess_role: "owner" | "manager" | "member" | null;
+  sub_mess_id: string | null;
 };
 
 export type AuthStore = {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
+  clearUser: () => void;
 };

@@ -116,7 +116,7 @@ export default function NavTabs() {
     visibleDesktopTabs.length + (hasDesktopMore ? 1 : 0) + 1;
 
   return (
-    <nav className="z-20 fixed bottom-0 left-0 w-full border-t bg-card shadow-lg">
+    <nav className="z-30 fixed bottom-0 left-0 w-full border-t bg-card shadow-lg">
       <ul
         className="sm:hidden grid items-center w-full"
         style={{

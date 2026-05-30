@@ -3,7 +3,6 @@ import { FetchSubMessesParams } from "./types";
 
 const DEFAULT_PAGE_SIZE = 10;
 
-// ── Fetch all sub-messes ───────────────────────────────────────────────────
 export async function fetchSubMesses({
   mess_id,
   page,
@@ -21,11 +20,15 @@ export async function fetchSubMesses({
 
   const qs = params.toString();
   const url = `/sub-mess/all/${mess_id}${qs ? `?${qs}` : ""}`;
-  const response = await api.get(url);
-  return response.data;
+  const res = await api.get(url);
+  return res.data;
 }
 
-// ── Create a new sub-mess ──────────────────────────────────────────────────
+export async function fetchSingleSubMess(id: string) {
+  const res = await api.get(`/sub-mess/${id}`);
+  return res.data.data;
+}
+
 export interface CreateSubMessBody {
   fname: string;
   total_rent?: number;
@@ -33,11 +36,10 @@ export interface CreateSubMessBody {
 }
 
 export async function createSubMess(mess_id: string, body: CreateSubMessBody) {
-  const response = await api.post(`/sub-mess/${mess_id}`, body);
-  return response.data;
+  const res = await api.post(`/sub-mess/${mess_id}`, body);
+  return res.data;
 }
 
-// ── Delete — single or bulk decided by set size ────────────────────────────
 export async function deleteSubMesses(ids: Set<string>) {
   if (ids.size === 0) return;
   if (ids.size === 1) {
