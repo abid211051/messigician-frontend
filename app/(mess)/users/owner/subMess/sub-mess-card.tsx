@@ -3,11 +3,11 @@
 import {
   Building2,
   Users,
-  Armchair,
   Banknote,
   Pencil,
   Trash2,
   MoreVertical,
+  CalendarDays,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { SubMessData } from "./types";
+import { aproxTimeAgo } from "@/lib/helpers/time";
+import { fmt } from "@/lib/helpers/helpers";
 
 interface SubMessCardProps {
   subMess: SubMessData;
@@ -56,12 +58,10 @@ export default function SubMessCard({
       <div className="p-3">
         {/* Top row: icon + name + checkbox */}
         <div className="flex items-start gap-2.5">
-          {/* Icon */}
           <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
             <Building2 className="w-4.5 h-4.5 text-blue-500" />
           </div>
 
-          {/* Name + utility */}
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-gray-900 leading-tight truncate">
               {subMess.sub_mess_name}
@@ -69,17 +69,16 @@ export default function SubMessCard({
             <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
               <Banknote className="w-3 h-3 shrink-0" />
               <span>
-                ৳ {Number(subMess.total_rent).toLocaleString()} rent
+                {fmt(subMess?.total_rent)}
                 {Number(subMess.total_utility) > 0 && (
-                  <span className="ml-1 text-gray-400">
-                    + ৳ {Number(subMess.total_utility).toLocaleString()} utility
+                  <span className="ml-1 text-gray-500 truncate">
+                    + {fmt(subMess.total_utility)} utility
                   </span>
                 )}
               </span>
             </div>
           </div>
 
-          {/* Checkbox */}
           <div className="shrink-0 pt-0.5">
             <Checkbox
               className="border-brand-secondary/50"
@@ -90,23 +89,22 @@ export default function SubMessCard({
           </div>
         </div>
 
-        {/* Bottom strip: seats/members + three-dot */}
+        {/* Bottom strip */}
         <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-gray-100">
-          <div className="flex items-center gap-3">
-            {/* Members */}
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+          {/* Left: members + occupancy badge + created_at */}
+          <div className="flex items-center gap-2 min-w-0 mr-1">
+            <div className="flex items-center gap-1 text-xs text-gray-500 shrink-0">
               <Users className="w-3 h-3 shrink-0" />
               <span>
                 <span className="font-medium text-gray-700">
                   {subMess.no_of_members}
                 </span>
-                /{subMess.no_of_seats} members
+                /{subMess.no_of_seats}
               </span>
             </div>
 
-            {/* Occupancy badge */}
             <span
-              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
                 isFull
                   ? "bg-red-50 text-red-500"
                   : occupancyPercent > 70
@@ -116,6 +114,13 @@ export default function SubMessCard({
             >
               {isFull ? "Full" : `${occupancyPercent}%`}
             </span>
+
+            <div className="flex items-center gap-0.5 text-[11px] text-gray-500 min-w-0">
+              <CalendarDays className="w-3 h-3 shrink-0" />
+              <span className="truncate">
+                {aproxTimeAgo(subMess.created_at)}
+              </span>
+            </div>
           </div>
 
           {/* Three-dot */}
@@ -124,7 +129,7 @@ export default function SubMessCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-gray-500 hover:text-gray-600 -mr-1"
+                className="h-6 w-6 text-gray-500 hover:text-gray-600 -mr-1 shrink-0"
               >
                 <MoreVertical className="h-3.5 w-3.5" />
                 <span className="sr-only">Actions</span>

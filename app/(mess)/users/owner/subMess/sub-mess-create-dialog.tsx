@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/reusable/numeric-field";
 import ConfirmDialog from "@/components/reusable/confirm-dialog";
 import { CreateSubMessBody } from "./action";
 import { CreateSubMessFormValues, createSubMessSchema } from "./validation";
@@ -49,18 +49,6 @@ export default function CreateSubMessDialog({
     });
   };
 
-  // ── Shared number onChange helper ─────────────────────────────────────────
-  // Uses valueAsNumber so the browser's own parsing decides the value.
-  // • Empty field  → NaN → undefined  (field treated as not filled in)
-  // • "3e2"        → 300             (valid; backend nonnegative check passes)
-  // • "-5"         → -5             (NaN on most browsers after onKeyDown blocks
-  //                                  "-"; pasted negatives hit zod nonnegative)
-  // • "3.5" in seats → 3.5          (zod .int() rejects it immediately)
-  const toNumber = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const n = e.target.valueAsNumber;
-    return isNaN(n) ? undefined : n;
-  };
-
   return (
     <ConfirmDialog
       open={open}
@@ -77,7 +65,7 @@ export default function CreateSubMessDialog({
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col gap-4"
       >
-        {/* Name */}
+        {/* Name — plain text, no numeric handling needed */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Name <span className="text-red-500">*</span>
@@ -98,7 +86,7 @@ export default function CreateSubMessDialog({
           )}
         </div>
 
-        {/* Total Rent */}
+        {/* Total Rent — non-negative, decimal allowed, optional */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Total Rent{" "}
@@ -110,17 +98,13 @@ export default function CreateSubMessDialog({
             control={control}
             name="total_rent"
             render={({ field }) => (
-              <Input
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(toNumber(e))}
-                onKeyDown={(e) => {
-                  // Block explicit minus/plus while typing; e/E are allowed
-                  // since 3e2 → 300 is harmless and passes nonnegative check.
-                  if (["-", "+"].includes(e.key)) e.preventDefault();
-                }}
+              <NumericInput
+                value={field.value}
+                onChange={field.onChange}
                 onBlur={field.onBlur}
-                type="number"
-                min={0}
+                allowNegative={false}
+                allowDecimal={true}
+                emptyAs="undefined"
                 placeholder="e.g. 8000"
                 className={`min-h-11 rounded-xl bg-card ${errors.total_rent ? "border-red-400" : ""}`}
               />
@@ -131,7 +115,7 @@ export default function CreateSubMessDialog({
           )}
         </div>
 
-        {/* No of Seats */}
+        {/* No. of Seats — positive integer only, optional */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             No. of Seats{" "}
@@ -143,19 +127,13 @@ export default function CreateSubMessDialog({
             control={control}
             name="no_of_seats"
             render={({ field }) => (
-              <Input
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(toNumber(e))}
-                onKeyDown={(e) => {
-                  // Block minus, plus, and decimal point while typing.
-                  // e/E (scientific) → valueAsNumber resolves to integer or NaN;
-                  // zod .int() catches any non-integer that slips through.
-                  if (["-", "+", "."].includes(e.key)) e.preventDefault();
-                }}
+              <NumericInput
+                value={field.value}
+                onChange={field.onChange}
                 onBlur={field.onBlur}
-                type="number"
-                min={1}
-                step={1}
+                allowNegative={false}
+                allowDecimal={false}
+                emptyAs="undefined"
                 placeholder="e.g. 4"
                 className={`min-h-11 rounded-xl bg-card ${errors.no_of_seats ? "border-red-400" : ""}`}
               />

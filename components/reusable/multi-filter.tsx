@@ -9,6 +9,14 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 export interface FilterOption {
   id: string;
@@ -37,34 +45,35 @@ export default function MultiFilter({
   const count = selectedIds.size;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors focus:outline-none ${
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`group h-9 gap-1.5 rounded-xl text-xs font-medium shrink-0 border-gray-200 text-gray-600 focus-visible:ring-0 focus-visible:ring-offset-0 ${
             count > 0
               ? "border-blue-400 bg-blue-50 text-blue-700"
               : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
           }`}
         >
           {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
-          <span>{label}</span>
+          <span className="hidden sm:inline">{label}</span>
           {count > 0 ? (
             <Badge className="ml-0.5 h-4 min-w-4 px-1.5 text-[10px] bg-blue-500 text-white rounded-full">
               {count}
             </Badge>
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+            <ChevronDown className="group-data-open:rotate-180 transition-transform w-3.5 h-3.5 text-gray-500" />
           )}
-        </button>
-      </PopoverTrigger>
+        </Button>
+      </DropdownMenuTrigger>
 
-      <PopoverContent align="start" className="w-52 max-h-60 p-1.5">
-        {/* Label */}
-        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 pb-1.5 pt-0.5">
+      <DropdownMenuContent align="start" className="w-52 p-1.5 rounded-xl">
+        <DropdownMenuLabel className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide px-2 py-1">
           {label}
-        </p>
-
-        <div className="overflow-y-auto">
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="overflow-y-auto max-h-52">
           {options.map((opt) => {
             const checked = selectedIds.has(opt.id);
             return (
@@ -109,7 +118,7 @@ export default function MultiFilter({
             </button>
           </div>
         )}
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

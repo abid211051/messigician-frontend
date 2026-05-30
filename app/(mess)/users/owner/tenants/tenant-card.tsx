@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { getAvatarColor, getInitials } from "@/lib/helpers/avatar";
 import { TenantData } from "./types";
+import { fmt } from "@/lib/helpers/helpers";
 
 interface TenantCardProps {
   tenant: TenantData;
@@ -29,8 +30,6 @@ interface TenantCardProps {
   onEdit: (tenant: TenantData) => void;
   onDelete: (id: string) => void;
 }
-
-// and the menu item:
 
 export default function TenantCard({
   tenant,
@@ -106,9 +105,9 @@ export default function TenantCard({
             <div className="flex items-center gap-1 text-brand-primary">
               {/* <Banknote className="w-3.5 h-3.5" /> */}
               <span
-                className={`font-bold ${tenant?.total_due > 0 ? "text-brand-secondary" : "text-danger"} text-sm`}
+                className={`flex font-bold ${tenant?.total_due > 0 ? "text-brand-secondary" : "text-danger"} text-sm`}
               >
-                {"৳ "} {tenant?.total_due ?? 0}
+                {fmt(tenant?.total_due)}
               </span>
             </div>
 

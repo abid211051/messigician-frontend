@@ -9,7 +9,9 @@ import {
   Search,
   ArrowUpDown,
   Plus,
-} from "lucide-react"; // ← Plus added
+  ArrowUp10,
+  ArrowDown10,
+} from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import SubMessCard from "./sub-mess-card";
 import ConfirmDialog from "@/components/reusable/confirm-dialog";
@@ -23,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SubMessData } from "./types";
+import { SortBy, SortOrder, SubMessData } from "./types";
 import {
   fetchSubMesses,
   deleteSubMesses,
@@ -33,16 +35,14 @@ import {
 import { handleApiError } from "@/lib/helpers/errors";
 import PageSkeleton from "@/components/reusable/loading-skeleton";
 import CreateSubMessDialog from "./sub-mess-create-dialog";
-
-const DEFAULT_PAGE_SIZE = 10;
-const PARAM_PAGE = "page";
-const PARAM_LIMIT = "limit";
-const PARAM_SEARCH = "search";
-const PARAM_SORT_BY = "sortBy";
-const PARAM_SORT_ORDER = "sortOrder";
-
-type SortBy = "created_at" | "total_rent" | "no_of_members";
-type SortOrder = "asc" | "desc";
+import {
+  DEFAULT_PAGE_SIZE,
+  PARAM_LIMIT,
+  PARAM_PAGE,
+  PARAM_SEARCH,
+  PARAM_SORT_BY,
+  PARAM_SORT_ORDER,
+} from "@/lib/constants";
 
 const SORT_OPTIONS: { label: string; value: SortBy }[] = [
   { label: "Date Created", value: "created_at" },
@@ -178,8 +178,7 @@ export default function SubMessClient() {
       initialSortBy,
       initialSortOrder,
     );
-  }, [mess_id]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  }, [mess_id]);
   const applyChange = useCallback(
     (
       nextPage: number,
@@ -287,14 +286,7 @@ export default function SubMessClient() {
 
   return (
     <>
-      {/* ── Toolbar: Search + Sort + Create ─────────────────────────────── */}
-      {/*
-        The search is capped at max-w-sm (lg: max-w-md) so it never
-        stretches across the full page on wide screens. Buttons stay
-        immediately to its right with the rest of the row left empty.
-      */}
       <div className="flex items-center gap-2 mb-3">
-        {/* Search — grows up to a sensible cap, never fills the viewport */}
         <div className="relative flex-1 max-w-xs sm:max-w-sm lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <input
@@ -315,12 +307,11 @@ export default function SubMessClient() {
               className="h-9 gap-1.5 rounded-xl text-xs shrink-0 border-gray-200"
             >
               <ArrowUpDown className="w-3 h-3" />
-              {/* Hide label on mobile to save space — icon is enough */}
               <span className="hidden sm:inline">{activeSortLabel}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-xs text-gray-400 font-medium">
+            <DropdownMenuLabel className="text-xs text-gray-500 font-medium">
               Sort by
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -332,19 +323,14 @@ export default function SubMessClient() {
               >
                 <span className="flex-1">{opt.label}</span>
                 {sortBy === opt.value && (
-                  <span className="text-xs text-gray-400 ml-2">
-                    {sortOrder === "desc" ? "↓" : "↑"}
+                  <span className="text-xs text-gray-500 ml-2">
+                    {sortOrder === "desc" ? <ArrowDown10 /> : <ArrowUp10 />}
                   </span>
                 )}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* ── Create button ──────────────────────────────────────────────────
-            Mobile  → icon only  (square, same height as the other buttons)
-            sm+     → icon + "Create" label
-        ────────────────────────────────────────────────────────────────── */}
         <Button
           size="sm"
           onClick={() => setCreateOpen(true)}
@@ -380,7 +366,7 @@ export default function SubMessClient() {
               aria-label="Select all"
             >
               <span
-                className={`w-[18px] h-[18px] rounded-[4px] border-2 flex items-center justify-center transition-all shrink-0 ${
+                className={`w-4.5 h-4.5 rounded-sm border-2 flex items-center justify-center transition-all shrink-0 ${
                   allSelected
                     ? "bg-blue-500 border-blue-500"
                     : someSelected

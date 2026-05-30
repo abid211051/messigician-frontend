@@ -16,3 +16,6 @@ export interface FetchSubMessesParams {
   sortBy?: "created_at" | "total_rent" | "no_of_members";
   sortOrder?: "asc" | "desc";
 }
+
+export type SortBy = "created_at" | "total_rent" | "no_of_members";
+export type SortOrder = "asc" | "desc";

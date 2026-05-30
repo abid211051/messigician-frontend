@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -14,6 +13,7 @@ import {
 import ConfirmDialog from "@/components/reusable/confirm-dialog";
 import { EditTenantDialogProps } from "./types";
 import { EditTenantFormValues, editTenantSchema } from "./validation";
+import { NumericInput } from "@/components/reusable/numeric-field";
 
 const FORM_ID = "edit-tenant-form";
 
@@ -29,19 +29,20 @@ export default function EditTenantDialog({
     control,
     handleSubmit,
     reset,
-
     formState: { errors },
   } = useForm<EditTenantFormValues>({
     resolver: zodResolver(editTenantSchema),
-    defaultValues: { sub_mess_id: "", monthly_rent: 0, total_due: 0 },
+    defaultValues: { sub_mess_id: "", monthly_rent: null, total_due: null },
   });
 
   useEffect(() => {
     if (open && tenant) {
+      const rent = tenant.monthly_rent ?? null;
+      const due = tenant.total_due ?? null;
       reset({
         sub_mess_id: tenant.sub_mess_id,
-        monthly_rent: tenant.monthly_rent ?? 0,
-        total_due: tenant.total_due ?? 0,
+        monthly_rent: rent,
+        total_due: due,
       });
     }
   }, [tenant, reset, open]);
@@ -64,7 +65,7 @@ export default function EditTenantDialog({
     >
       {tenant && (
         <p className="text-sm font-bold text-muted-foreground mb-3">
-          {tenant?.tenant_name}
+          {tenant.tenant_name}
         </p>
       )}
 
@@ -73,6 +74,7 @@ export default function EditTenantDialog({
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col gap-4"
       >
+        {/* Sub-mess */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Sub-mess
@@ -106,6 +108,7 @@ export default function EditTenantDialog({
           )}
         </div>
 
+        {/* Monthly Rent — non-negative only */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Monthly Rent
@@ -114,22 +117,14 @@ export default function EditTenantDialog({
             control={control}
             name="monthly_rent"
             render={({ field }) => (
-              <Input
-                value={field.value ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value.trim();
-                  field.onChange(
-                    val === "" || Number.isNaN(Number(val))
-                      ? ""
-                      : parseFloat(val),
-                  );
-                }}
-                onKeyDown={(e) => {
-                  if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
-                }}
+              <NumericInput
+                value={field.value}
+                onChange={field.onChange}
                 onBlur={field.onBlur}
-                type="number"
-                placeholder="e.g. 3500"
+                allowNegative={false}
+                allowDecimal={true}
+                emptyAs="null"
+                placeholder="e.g. 8000"
                 className={`min-h-11 rounded-xl bg-card ${errors.monthly_rent ? "border-red-400" : ""}`}
               />
             )}
@@ -141,6 +136,7 @@ export default function EditTenantDialog({
           )}
         </div>
 
+        {/* Total Due — any number including negative */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Total Due
@@ -149,22 +145,14 @@ export default function EditTenantDialog({
             control={control}
             name="total_due"
             render={({ field }) => (
-              <Input
-                value={field.value ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value.trim();
-                  field.onChange(
-                    val === "" || Number.isNaN(Number(val))
-                      ? ""
-                      : parseFloat(val),
-                  );
-                }}
-                onKeyDown={(e) => {
-                  if (["e", "E"].includes(e.key)) e.preventDefault();
-                }}
+              <NumericInput
+                value={field.value}
+                onChange={field.onChange}
                 onBlur={field.onBlur}
-                type="number"
-                placeholder="e.g. 5000"
+                allowNegative={true}
+                allowDecimal={true}
+                emptyAs="null"
+                placeholder="e.g. 8000"
                 className={`min-h-11 rounded-xl bg-card ${errors.total_due ? "border-red-400" : ""}`}
               />
             )}
