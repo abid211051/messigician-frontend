@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { handleApiError } from "@/lib/helpers/errors";
-import { fetchSubMesses } from "./tenants/action";
+import { fetchSubMesses } from "./tenants/actions";
 import type { SubMessOption } from "./tenants/types";
 
 export default function SubMessSelector() {

@@ -17,7 +17,7 @@ import {
   fetchSubMesses,
   deleteTenants,
   updateTenant,
-} from "./action";
+} from "./actions";
 import { handleApiError } from "@/lib/helpers/errors";
 import { EditTenantFormValues } from "./validation";
 

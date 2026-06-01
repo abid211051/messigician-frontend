@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { NumericInput } from "@/components/reusable/numeric-field";
 import ConfirmDialog from "@/components/reusable/confirm-dialog";
-import { CreateSubMessBody } from "./action";
+import { CreateSubMessBody } from "./actions";
 import { CreateSubMessFormValues, createSubMessSchema } from "./validation";
 
 const FORM_ID = "create-sub-mess-form";

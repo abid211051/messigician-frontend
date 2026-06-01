@@ -7,7 +7,7 @@ import {
   acceptJoinRequest,
   getAllJoinRequests,
   rejectJoinRequest,
-} from "./action";
+} from "./actions";
 import { getAvatarColor, getInitials } from "@/lib/helpers/avatar";
 import { aproxTimeAgo } from "@/lib/helpers/time"; // move the function here
 import FilterBtn from "./filterBtn";

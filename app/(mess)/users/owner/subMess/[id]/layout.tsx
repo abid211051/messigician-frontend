@@ -1,7 +1,7 @@
 import { SYSTEM_WIDE_PADDING } from "@/lib/constants";
 import { Building2, LogOut } from "lucide-react";
 import Link from "next/link";
-import { fetchSingleSubMess } from "../action";
+import { fetchSingleSubMess } from "../actions";
 import { handleApiError } from "@/lib/helpers/errors";
 import PageSkeleton from "@/components/reusable/loading-skeleton";
 

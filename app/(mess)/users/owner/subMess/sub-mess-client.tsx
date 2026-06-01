@@ -31,7 +31,7 @@ import {
   deleteSubMesses,
   createSubMess,
   CreateSubMessBody,
-} from "./action";
+} from "./actions";
 import { handleApiError } from "@/lib/helpers/errors";
 import PageSkeleton from "@/components/reusable/loading-skeleton";
 import CreateSubMessDialog from "./sub-mess-create-dialog";

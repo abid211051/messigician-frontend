@@ -1,7 +1,15 @@
+import MealsClient from "@/components/meals/meals-client";
 import { SYSTEM_WIDE_PADDING } from "@/lib/constants";
 
-export default function OwnerSubMessMealsPage() {
+export default async function OwnerSubMessMealsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   return (
-    <div className={`${SYSTEM_WIDE_PADDING}`}>this is submess meals page</div>
+    <div>
+      <MealsClient subMessId={id} isOwner={true} />
+    </div>
   );
 }
