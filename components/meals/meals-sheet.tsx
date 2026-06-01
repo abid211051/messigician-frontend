@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import MealCell from "./meals-cell";
-import type { SheetData, MealPhase } from "@/app/(meals)/types";
+import type { SheetData } from "@/app/(meals)/types";
 
 interface Props {
   data: SheetData;
@@ -16,19 +16,9 @@ interface Props {
   ) => void;
 }
 
-function currentHHMM(): string {
+function hhMM(): string {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-function isInAnyWindow(phases: MealPhase[]): boolean {
-  const t = currentHHMM();
-  return phases.some((p) => t >= p.edit_start && t <= p.edit_end);
-}
-
-function isInPhaseWindow(phase: MealPhase): boolean {
-  const t = currentHHMM();
-  return t >= phase.edit_start && t <= phase.edit_end;
 }
 
 export default function MealSheet({
@@ -38,56 +28,50 @@ export default function MealSheet({
   onCellChange,
 }: Props) {
   const { month, members, entries, shopping } = data;
-  const { phases, rate_type, status } = month;
-  const today = new Date().getDate();
+  const { phases, status } = month;
+  const now = new Date();
+  const isThisMonth =
+    now.getFullYear() === month.year && now.getMonth() + 1 === month.month;
+  const today = now.getDate();
   const daysInMonth = new Date(month.year, month.month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const isClosed = status === "closed";
 
-  // Memoised checks (computed once per render, not per cell)
-  const memberCanEditNow = useMemo(
-    () => !isClosed && isInAnyWindow(phases),
-    [isClosed, phases],
-  );
-  const phaseWindowMap = useMemo(
-    () =>
-      Object.fromEntries(
-        phases.map((p) => [p.id, !isClosed && isInPhaseWindow(p)]),
-      ),
-    [isClosed, phases],
-  );
+  // Whether each phase's edit window is currently open — computed once per render
+  const phaseWindowMap = useMemo(() => {
+    const t = hhMM();
+    return Object.fromEntries(
+      phases.map((p) => [
+        p.id,
+        !isClosed && t >= p.edit_start && t <= p.edit_end,
+      ]),
+    );
+  }, [phases, isClosed]);
 
-  // entry lookup: "memberId-day-phaseId" → count
   const entryMap = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const e of entries) {
-      for (const [pId, cnt] of Object.entries(e.counts)) {
+    for (const e of entries)
+      for (const [pId, cnt] of Object.entries(e.counts))
         m[`${e.member_id}-${e.day_number}-${pId}`] = cnt;
-      }
-    }
     return m;
   }, [entries]);
 
-  // Total meals per member (for totals row)
   const memberTotals = useMemo(() => {
     const t: Record<string, number> = {};
-    for (const e of entries) {
+    for (const e of entries)
       t[e.member_id] =
         (t[e.member_id] ?? 0) +
         Object.values(e.counts).reduce((a, b) => a + b, 0);
-    }
     return t;
   }, [entries]);
 
-  // Total per member per phase (fixed totals row)
   const phaseTotals = useMemo(() => {
-    const t: Record<string, number> = {}; // "memberId-phaseId"
-    for (const e of entries) {
+    const t: Record<string, number> = {};
+    for (const e of entries)
       for (const [pId, cnt] of Object.entries(e.counts)) {
         const k = `${e.member_id}-${pId}`;
         t[k] = (t[k] ?? 0) + cnt;
       }
-    }
     return t;
   }, [entries]);
 
@@ -100,79 +84,67 @@ export default function MealSheet({
 
   const STICKY = "sticky left-0 z-10";
   const HDR = "text-[10px] font-semibold text-gray-500 uppercase tracking-wide";
-  const CELL_W = rate_type === "dynamic" ? "min-w-[72px]" : "min-w-[52px]";
+  const CELL_W = "min-w-[52px]";
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white mb-3">
       <table className="border-collapse text-xs w-full">
         <thead>
-          {/* ── Row 1 ── */}
+          {/* Row 1: Day | Member names (colSpan=phases.length) | Shop */}
           <tr className="border-b border-gray-100 bg-gray-50/60">
             <th
               className={`${STICKY} bg-gray-50/60 px-2 py-2.5 text-left ${HDR} border-r border-gray-100 min-w-[44px]`}
             >
               Day
             </th>
-
-            {rate_type === "dynamic" &&
-              members.map((m) => (
-                <th
-                  key={m.id}
-                  className={`${CELL_W} px-1.5 py-2.5 text-center ${HDR} border-r border-gray-100 last:border-r-0`}
-                >
-                  <span
-                    className="truncate block max-w-[68px] mx-auto"
-                    title={m.name}
-                  >
-                    {m.name.split(" ")[0]}
-                  </span>
-                </th>
-              ))}
-
-            {rate_type === "fixed" &&
-              members.map((m) => (
-                <th
-                  key={m.id}
-                  colSpan={phases.length}
-                  className={`px-1.5 py-2 text-center ${HDR} border-r border-gray-100 last:border-r-0`}
-                >
-                  <span className="truncate block mx-auto" title={m.name}>
-                    {m.name.split(" ")[0]}
-                  </span>
-                </th>
-              ))}
-
+            {members.map((m) => (
+              <th
+                key={m.id}
+                colSpan={phases.length}
+                className={`px-1.5 py-2 text-center ${HDR} border-r border-gray-100 last:border-r-0`}
+              >
+                <span className="truncate block mx-auto" title={m.name}>
+                  {m.name.split(" ")[0]}
+                </span>
+              </th>
+            ))}
             <th className={`${CELL_W} px-1.5 py-2.5 text-center ${HDR}`}>
               Shop (৳)
             </th>
           </tr>
 
-          {/* ── Row 2: phase sub-headers (fixed only) ── */}
-          {rate_type === "fixed" && (
-            <tr className="border-b border-gray-100 bg-gray-50/30">
-              <th
-                className={`${STICKY} bg-gray-50/30 px-2 py-1 border-r border-gray-100`}
-              />
-              {members.flatMap((m) =>
-                phases.map((p, pi) => (
-                  <th
-                    key={`${m.id}-${p.id}`}
-                    className={`${CELL_W} px-1 py-1 text-center text-[9px] text-gray-400 font-medium ${pi === phases.length - 1 ? "border-r border-gray-100" : ""}`}
-                    title={`${p.name} · ৳${p.rate}/meal`}
-                  >
-                    {p.name.slice(0, 3)}
+          {/* Row 2: Phase names + rate indicator */}
+          <tr className="border-b border-gray-100 bg-gray-50/30">
+            <th
+              className={`${STICKY} bg-gray-50/30 px-2 py-1 border-r border-gray-100`}
+            />
+            {members.flatMap((m) =>
+              phases.map((p, pi) => (
+                <th
+                  key={`${m.id}-${p.id}`}
+                  className={`${CELL_W} px-1 py-1 text-center text-[9px] font-medium text-gray-400 ${
+                    pi === phases.length - 1 ? "border-r border-gray-100" : ""
+                  }`}
+                  title={
+                    p.rate_type === "fixed"
+                      ? `${p.name} · ৳${p.rate}/meal (fixed)`
+                      : `${p.name} (dynamic)`
+                  }
+                >
+                  {p.name.slice(0, 3)}
+                  {p.rate_type === "fixed" && (
                     <span className="ml-0.5 text-gray-300">·{p.rate}</span>
-                  </th>
-                )),
-              )}
-              <th />
-            </tr>
-          )}
+                  )}
+                </th>
+              )),
+            )}
+            <th />
+          </tr>
         </thead>
 
         <tbody>
           {days.map((day) => {
-            const isToday = day === today;
+            const isToday = isThisMonth && day === today;
             return (
               <tr
                 key={day}
@@ -180,7 +152,7 @@ export default function MealSheet({
               >
                 {/* Day label */}
                 <td
-                  className={`${STICKY} bg-white px-2 py-0.5 border-r border-gray-100 font-medium whitespace-nowrap text-gray-600 ${isToday ? "text-blue-600" : ""}`}
+                  className={`${STICKY} ${isToday ? "bg-blue-50/30" : "bg-white"} px-2 py-0.5 border-r border-gray-100 font-medium whitespace-nowrap text-gray-600 ${isToday ? "text-blue-600" : ""}`}
                 >
                   {day}
                   {isToday && (
@@ -190,65 +162,39 @@ export default function MealSheet({
                   )}
                 </td>
 
-                {/* ── Dynamic: one cell per member ── */}
-                {rate_type === "dynamic" &&
-                  members.map((m) => {
-                    const value = entryMap[`${m.id}-${day}-total`] ?? 0;
+                {/* One cell per phase per member */}
+                {members.flatMap((m) =>
+                  phases.map((p, pi) => {
+                    const value = entryMap[`${m.id}-${day}-${p.id}`] ?? 0;
                     const canEdit =
                       isOwner ||
-                      (m.id === currentUserId && isToday && memberCanEditNow);
+                      (m.id === currentUserId &&
+                        isToday &&
+                        phaseWindowMap[p.id]);
                     return (
                       <td
-                        key={m.id}
-                        className="border-r border-gray-100 last:border-r-0 p-0"
+                        key={`${m.id}-${p.id}`}
+                        className={`p-0 ${pi === phases.length - 1 ? "border-r border-gray-100" : ""} ${isToday ? "bg-blue-50/30" : ""}`}
                       >
                         <MealCell
                           monthId={month.id}
                           memberId={m.id}
                           dayNumber={day}
-                          phaseId="total"
+                          phaseId={p.id}
                           value={value}
                           canEdit={canEdit}
                           isClosed={!isOwner && isClosed}
-                          onSuccess={(c) => onCellChange(m.id, day, "total", c)}
+                          onSuccess={(c) => onCellChange(m.id, day, p.id, c)}
                         />
                       </td>
                     );
-                  })}
-
-                {/* ── Fixed: one cell per phase per member ── */}
-                {rate_type === "fixed" &&
-                  members.flatMap((m, mi) =>
-                    phases.map((p, pi) => {
-                      const value = entryMap[`${m.id}-${day}-${p.id}`] ?? 0;
-                      const canEdit =
-                        isOwner ||
-                        (m.id === currentUserId &&
-                          isToday &&
-                          phaseWindowMap[p.id]);
-                      const isLastPhase = pi === phases.length - 1;
-                      return (
-                        <td
-                          key={`${m.id}-${p.id}`}
-                          className={`p-0 ${isLastPhase ? "border-r border-gray-100" : ""}`}
-                        >
-                          <MealCell
-                            monthId={month.id}
-                            memberId={m.id}
-                            dayNumber={day}
-                            phaseId={p.id}
-                            value={value}
-                            canEdit={canEdit}
-                            isClosed={!isOwner && isClosed}
-                            onSuccess={(c) => onCellChange(m.id, day, p.id, c)}
-                          />
-                        </td>
-                      );
-                    }),
-                  )}
+                  }),
+                )}
 
                 {/* Shopping */}
-                <td className="px-1.5 py-1.5 text-center text-gray-600 tabular-nums">
+                <td
+                  className={`px-1.5 py-1.5 text-center text-gray-600 tabular-nums ${isToday ? "bg-blue-50/30" : ""}`}
+                >
                   {shoppingByDay[day] ? (
                     shoppingByDay[day].toLocaleString()
                   ) : (
@@ -266,32 +212,16 @@ export default function MealSheet({
             >
               Total
             </td>
-
-            {rate_type === "dynamic" &&
-              members.map((m) => (
+            {members.flatMap((m) =>
+              phases.map((p, pi) => (
                 <td
-                  key={m.id}
-                  className="text-center px-1.5 py-1.5 border-r border-gray-100 last:border-r-0 text-gray-800 tabular-nums text-xs"
+                  key={`${m.id}-${p.id}`}
+                  className={`text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs ${pi === phases.length - 1 ? "border-r border-gray-100" : ""}`}
                 >
-                  {memberTotals[m.id] ?? 0}
+                  {phaseTotals[`${m.id}-${p.id}`] ?? 0}
                 </td>
-              ))}
-
-            {rate_type === "fixed" &&
-              members.flatMap((m, mi) =>
-                phases.map((p, pi) => {
-                  const isLastPhase = pi === phases.length - 1;
-                  return (
-                    <td
-                      key={`${m.id}-${p.id}`}
-                      className={`text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs ${isLastPhase ? "border-r border-gray-100" : ""}`}
-                    >
-                      {phaseTotals[`${m.id}-${p.id}`] ?? 0}
-                    </td>
-                  );
-                }),
-              )}
-
+              )),
+            )}
             <td className="text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs">
               {Object.values(shoppingByDay)
                 .reduce((a, b) => a + b, 0)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { handleApiError } from "@/lib/helpers/errors";
 import { upsertMealEntry } from "@/app/(meals)/actions";
 
@@ -27,10 +27,11 @@ export default function MealCell({
 }: Props) {
   const [local, setLocal] = useState(value);
   const [saving, setSaving] = useState(false);
-  const debounce = useRef<ReturnType<typeof setTimeout>>();
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     setLocal(value);
+    setDirty(false);
   }, [value]);
 
   const save = async (count: number) => {
@@ -55,19 +56,19 @@ export default function MealCell({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.value === "") {
       setLocal(0);
+      setDirty(true);
       return;
     }
     const parsed = parseInt(e.target.value, 10);
     if (isNaN(parsed)) return;
     const clamped = Math.min(5000, Math.max(0, parsed));
     setLocal(clamped);
-    clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => save(clamped), 600);
+    setDirty(true);
   };
 
   if (isClosed || !canEdit) {
     return (
-      <div className="flex items-center justify-center px-1 py-1.5 min-w-[48px] h-8">
+      <div className="flex items-center justify-center px-1 py-1.5 min-w-12 h-8">
         <span
           className={`text-xs tabular-nums ${value === 0 ? "text-gray-300" : "text-gray-700 font-medium"}`}
         >
@@ -79,7 +80,7 @@ export default function MealCell({
 
   return (
     <div
-      className={`flex items-center justify-center px-1 py-1 min-w-[48px] h-8 ${saving ? "opacity-40" : ""}`}
+      className={`flex items-center justify-center px-1 py-1 min-w-12 h-8 ${saving ? "opacity-40" : ""}`}
     >
       <input
         type="number"
@@ -94,7 +95,8 @@ export default function MealCell({
         }
         onFocus={(e) => e.target.select()}
         onBlur={() => {
-          if (local === 0 && value !== 0) save(0);
+          if (dirty && local !== value) save(local);
+          else setDirty(false);
         }}
         className="
           w-10 h-6 text-center text-xs font-medium tabular-nums rounded

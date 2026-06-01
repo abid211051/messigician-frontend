@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useEffect, useTransition, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ShoppingCart, Wallet } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ShoppingCart,
+  Wallet,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { handleApiError } from "@/lib/helpers/errors";
 import PageSkeleton from "@/components/reusable/loading-skeleton";
+import ConfirmDialog from "@/components/reusable/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import MealSheet from "./meals-sheet";
 import SummaryBar from "./summary-bar";
@@ -14,9 +22,64 @@ import StartMonthDialog from "./start-month-dialog";
 import {
   fetchSheet,
   createMonth,
+  updateMonthPhases,
+  deleteMonth,
   getPreviousSettings,
 } from "@/app/(meals)/actions";
-import type { SheetData, MonthCreatePayload } from "@/app/(meals)/types";
+import type {
+  SheetData,
+  MemberSummary,
+  MealPhase,
+  MonthCreatePayload,
+} from "@/app/(meals)/types";
+
+// Recalculate summary client-side after optimistic updates
+function recalculate(
+  data: SheetData,
+): Pick<SheetData, "summary" | "member_summary"> {
+  const { phases } = data.month;
+  const totalShopping = data.shopping.reduce((s, e) => s + Number(e.amount), 0);
+  const totalMeals = data.entries.reduce(
+    (s, e) => s + Object.values(e.counts).reduce((a, b) => a + b, 0),
+    0,
+  );
+  const perMealCost =
+    totalMeals > 0 ? +(totalShopping / totalMeals).toFixed(4) : 0;
+
+  const memberSummary: MemberSummary[] = data.members.map((member) => {
+    let meals = 0,
+      mealCost = 0;
+    for (const e of data.entries.filter((e) => e.member_id === member.id)) {
+      for (const [phaseId, count] of Object.entries(e.counts)) {
+        meals += count;
+        const phase = phases.find((p) => p.id === phaseId);
+        mealCost +=
+          phase?.rate_type === "fixed"
+            ? count * phase.rate
+            : count * perMealCost;
+      }
+    }
+    const totalDeposit = data.deposits
+      .filter((d) => d.member_id === member.id)
+      .reduce((s, d) => s + Number(d.amount), 0);
+    return {
+      ...member,
+      total_meals: meals,
+      meal_cost: +mealCost.toFixed(2),
+      total_deposit: totalDeposit,
+      balance: +(mealCost - totalDeposit).toFixed(2),
+    };
+  });
+
+  return {
+    summary: {
+      total_meals: totalMeals,
+      total_shopping: totalShopping,
+      per_meal_cost: perMealCost,
+    },
+    member_summary: memberSummary,
+  };
+}
 
 interface Props {
   subMessId: string;
@@ -30,17 +93,23 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
 
+  const offset =
+    (year - now.getFullYear()) * 12 + (month - (now.getMonth() + 1));
+  const canGoPrev = offset > -3;
+  const canGoNext = offset < 3;
+  const canCreate = offset >= 0 && offset <= 3;
+
   const prevMonth = () => {
-    if (month === 1) {
-      setYear((y) => y - 1);
-      setMonth(12);
-    } else setMonth((m) => m - 1);
+    if (!canGoPrev) return;
+    month === 1
+      ? (setYear((y) => y - 1), setMonth(12))
+      : setMonth((m) => m - 1);
   };
   const nextMonth = () => {
-    if (month === 12) {
-      setYear((y) => y + 1);
-      setMonth(1);
-    } else setMonth((m) => m + 1);
+    if (!canGoNext) return;
+    month === 12
+      ? (setYear((y) => y + 1), setMonth(1))
+      : setMonth((m) => m + 1);
   };
 
   const [data, setData] = useState<SheetData | null>(null);
@@ -49,11 +118,22 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
 
   const [shoppingOpen, setShoppingOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
-  const [startOpen, setStartOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+
+  // Sheet dialog — shared between create and edit modes
+  const [sheetDialogOpen, setSheetDialogOpen] = useState(false);
+  const [sheetDialogMode, setSheetDialogMode] = useState<"create" | "edit">(
+    "create",
+  );
+  const [sheetDialogPhases, setSheetDialogPhases] = useState<
+    MealPhase[] | undefined
+  >();
   const [prevSettings, setPrevSettings] = useState<MonthCreatePayload | null>(
     null,
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const load = useCallback(() => {
     startLoading(async () => {
@@ -72,29 +152,56 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
     load();
   }, [load]);
 
-  // Load previous settings when the dialog opens
-  const handleOpenStartDialog = async () => {
+  // ── Open create dialog ─────────────────────────────────────────────────
+  const handleOpenCreate = async () => {
     const prev = await getPreviousSettings();
     setPrevSettings(prev);
-    setStartOpen(true);
+    setSheetDialogMode("create");
+    setSheetDialogPhases(undefined);
+    setSheetDialogOpen(true);
   };
 
-  const handleCreateMonth = async (payload: MonthCreatePayload) => {
-    setIsCreating(true);
-    try {
-      const newData = await createMonth(subMessId, year, month, payload);
-      setData(newData);
-      setStartOpen(false);
-    } catch (err) {
-      console.log(err);
+  // ── Open edit dialog ───────────────────────────────────────────────────
+  const handleOpenEdit = () => {
+    if (!data) return;
+    setSheetDialogMode("edit");
+    setSheetDialogPhases(data.month.phases);
+    setSheetDialogOpen(true);
+  };
 
+  // ── Dialog submit (create or edit) ─────────────────────────────────────
+  const handleSheetSubmit = async (payload: MonthCreatePayload) => {
+    setIsSubmitting(true);
+    try {
+      const updated =
+        sheetDialogMode === "create"
+          ? await createMonth(subMessId, year, month, payload)
+          : await updateMonthPhases(data!.month.id, payload);
+      setData(updated);
+      setSheetDialogOpen(false);
+    } catch (err) {
       handleApiError(err);
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Optimistic update — patches just the one changed cell
+  // ── Delete sheet ───────────────────────────────────────────────────────
+  const handleDeleteSheet = async () => {
+    if (!data) return;
+    setIsDeleting(true);
+    try {
+      await deleteMonth(data.month.id);
+      setData(null);
+      setDeleteOpen(false);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // ── Optimistic cell update ─────────────────────────────────────────────
   const handleCellChange = (
     memberId: string,
     dayNumber: number,
@@ -121,7 +228,8 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
                 ? { ...e, counts: { ...e.counts, [phaseId]: count } }
                 : e,
             );
-      return { ...prev, entries };
+      const next = { ...prev, entries };
+      return { ...next, ...recalculate(next) };
     });
   };
 
@@ -133,29 +241,54 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
   if (!initialised || isPending) return <PageSkeleton count={8} />;
 
   return (
-    <div className="pb-24 px-3 pt-3 max-w-[1400px] mx-auto">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2 mb-3">
+    <div className="pb-24 max-w-screen-xl mx-auto">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        {/* Month navigation */}
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 active:scale-95 transition-all"
+            disabled={!canGoPrev}
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 active:scale-95 transition-all disabled:opacity-40"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
-          <span className="text-sm font-semibold text-gray-800 min-w-[120px] text-center">
+          <span className="text-sm font-semibold text-gray-800 min-w-32 text-center">
             {monthLabel}
           </span>
           <button
             onClick={nextMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 active:scale-95 transition-all"
+            disabled={!canGoNext}
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 active:scale-95 transition-all disabled:opacity-40"
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
+        {/* Owner actions */}
         {isOwner && (
           <div className="flex items-center gap-1.5">
+            {data && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleOpenEdit}
+                  className="h-7 px-2.5 text-xs gap-1.5 rounded-lg border-gray-200"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span className="hidden sm:inline">Edit Sheet</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDeleteOpen(true)}
+                  className="h-7 px-2.5 text-xs gap-1.5 rounded-lg border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span className="hidden sm:inline">Delete</span>
+                </Button>
+              </>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -178,18 +311,14 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
         )}
       </div>
 
-      {/* Content */}
+      {/* ── Content ─────────────────────────────────────────────── */}
       {!data ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white/60 px-4 py-10 text-center">
           <p className="text-sm text-gray-500 mb-3">
             No meal sheet for {monthLabel} yet.
           </p>
-          {isOwner && (
-            <Button
-              size="sm"
-              onClick={handleOpenStartDialog}
-              className="rounded-xl"
-            >
+          {isOwner && canCreate && (
+            <Button size="sm" onClick={handleOpenCreate} className="rounded-xl">
               Start this month
             </Button>
           )}
@@ -203,7 +332,7 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
             onCellChange={handleCellChange}
           />
           <SummaryBar
-            rateType={data.month.rate_type}
+            phases={data.month.phases}
             summary={data.summary}
             memberSummary={data.member_summary}
             currentUserId={userId!}
@@ -211,17 +340,35 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
         </>
       )}
 
-      {/* Dialogs / Panels */}
+      {/* ── Sheet create/edit dialog ─────────────────────────────── */}
       <StartMonthDialog
-        open={startOpen}
-        onOpenChange={setStartOpen}
+        open={sheetDialogOpen}
+        onOpenChange={setSheetDialogOpen}
         year={year}
         month={month}
-        previousSettings={prevSettings}
-        isLoading={isCreating}
-        onSubmit={handleCreateMonth}
+        mode={sheetDialogMode}
+        initialPhases={sheetDialogPhases}
+        previousSettings={
+          sheetDialogMode === "create" ? prevSettings : undefined
+        }
+        isLoading={isSubmitting}
+        onSubmit={handleSheetSubmit}
       />
 
+      {/* ── Delete confirm ───────────────────────────────────────── */}
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this month's sheet?"
+        description="All meal entries, shopping, and deposit data for this month will be permanently deleted."
+        confirmLabel="Delete Sheet"
+        cancelLabel="Cancel"
+        variant="destructive"
+        isLoading={isDeleting}
+        onConfirm={handleDeleteSheet}
+      />
+
+      {/* ── Panels ───────────────────────────────────────────────── */}
       {isOwner && data && (
         <>
           <ShoppingPanel

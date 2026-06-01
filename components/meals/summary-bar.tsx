@@ -1,9 +1,9 @@
 "use client";
 
-import type { MemberSummary, RateType } from "@/app/(meals)/types";
+import type { MealPhase, MemberSummary } from "@/app/(meals)/types";
 
 interface Props {
-  rateType: RateType;
+  phases: MealPhase[];
   summary: {
     total_meals: number;
     total_shopping: number;
@@ -14,12 +14,20 @@ interface Props {
 }
 
 export default function SummaryBar({
-  rateType,
+  phases,
   summary,
   memberSummary,
   currentUserId,
 }: Props) {
   const { total_meals, total_shopping, per_meal_cost } = summary;
+  const hasDynamic = phases.some((p) => p.rate_type === "dynamic");
+  const hasFixed = phases.some((p) => p.rate_type === "fixed");
+
+  const perMealDisplay = !hasDynamic
+    ? "Fixed Rate"
+    : per_meal_cost > 0
+      ? `৳ ${per_meal_cost.toFixed(2)}${hasFixed ? "*" : ""}`
+      : "—";
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white overflow-hidden mb-3">
@@ -29,17 +37,13 @@ export default function SummaryBar({
           label="Total Shopping"
           value={`৳ ${total_shopping.toLocaleString()}`}
         />
-        <Stat
-          label="Per Meal"
-          value={
-            rateType === "fixed"
-              ? "Fixed Rate"
-              : per_meal_cost > 0
-                ? `৳ ${per_meal_cost.toFixed(2)}`
-                : "—"
-          }
-        />
+        <Stat label="Per Meal" value={perMealDisplay} />
       </div>
+      {hasFixed && hasDynamic && (
+        <p className="text-[10px] text-gray-400 px-3 py-1.5 border-b border-gray-50">
+          * Dynamic rate — fixed-rate phases use their own rate
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">

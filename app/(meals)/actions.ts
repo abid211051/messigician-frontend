@@ -4,12 +4,9 @@ import type {
   ShoppingEntry,
   DepositEntry,
   MealPhase,
-  RateType,
   MonthCreatePayload,
 } from "./types";
 
-// ── Stable mock IDs ────────────────────────────────────────────────────────
-const MONTH_ID = "aaaaaaaa-0000-0000-0000-000000000001";
 const MEMBER_1 = "bbbbbbbb-0000-0000-0000-000000000001";
 const MEMBER_2 = "bbbbbbbb-0000-0000-0000-000000000002";
 const MEMBER_3 = "bbbbbbbb-0000-0000-0000-000000000003";
@@ -20,13 +17,13 @@ const MEMBERS = [
   { id: MEMBER_3, name: "Karim Hossain" },
 ];
 
-// ── Month configuration state ──────────────────────────────────────────────
-// Switch rate_type to "fixed" and update phases to test fixed-rate mode
-let _rateType: RateType = "dynamic";
-let _phases: MealPhase[] = [
+let _lastSettings: MonthCreatePayload | null = null;
+
+const DEFAULT_PHASES: MealPhase[] = [
   {
     id: "ph-lunch",
     name: "Lunch",
+    rate_type: "dynamic",
     rate: 0,
     edit_start: "07:00",
     edit_end: "11:00",
@@ -34,31 +31,41 @@ let _phases: MealPhase[] = [
   {
     id: "ph-dinner",
     name: "Dinner",
+    rate_type: "dynamic",
     rate: 0,
     edit_start: "18:00",
     edit_end: "22:00",
   },
 ];
 
-// Stores last created month's settings for "keep previous settings"
-let _lastSettings: MonthCreatePayload | null = null;
-
-let _monthStatus: "active" | "closed" = "active";
-
-// ── Entry state ────────────────────────────────────────────────────────────
-// Dynamic: counts = { total: N }
-// Fixed:   counts = { [phaseId]: N }
-let _entries: MealEntry[] = [
-  { member_id: MEMBER_1, day_number: 1, counts: { total: 2 } },
-  { member_id: MEMBER_2, day_number: 1, counts: { total: 1 } },
-  { member_id: MEMBER_3, day_number: 1, counts: { total: 1 } },
-  { member_id: MEMBER_1, day_number: 2, counts: { total: 2 } },
-  { member_id: MEMBER_2, day_number: 2, counts: { total: 2 } },
-  { member_id: MEMBER_1, day_number: 3, counts: { total: 1 } },
-  { member_id: MEMBER_3, day_number: 3, counts: { total: 2 } },
+// Seed entries use real phase IDs (not "total")
+const DEFAULT_ENTRIES: MealEntry[] = [
+  {
+    member_id: MEMBER_1,
+    day_number: 1,
+    counts: { "ph-lunch": 1, "ph-dinner": 1 },
+  },
+  { member_id: MEMBER_2, day_number: 1, counts: { "ph-lunch": 1 } },
+  { member_id: MEMBER_3, day_number: 1, counts: { "ph-dinner": 1 } },
+  {
+    member_id: MEMBER_1,
+    day_number: 2,
+    counts: { "ph-lunch": 1, "ph-dinner": 1 },
+  },
+  {
+    member_id: MEMBER_2,
+    day_number: 2,
+    counts: { "ph-lunch": 1, "ph-dinner": 1 },
+  },
+  { member_id: MEMBER_1, day_number: 3, counts: { "ph-lunch": 1 } },
+  {
+    member_id: MEMBER_3,
+    day_number: 3,
+    counts: { "ph-lunch": 1, "ph-dinner": 1 },
+  },
 ];
 
-let _shopping: ShoppingEntry[] = [
+const DEFAULT_SHOPPING: ShoppingEntry[] = [
   {
     id: "sh-1",
     day_number: 1,
@@ -85,62 +92,72 @@ let _shopping: ShoppingEntry[] = [
   },
 ];
 
-let _deposits: DepositEntry[] = [];
+type StoredMonth = SheetData;
+const _months = new Map<string, StoredMonth>();
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function delay(ms = 300) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
+function monthKey(y: number, m: number) {
+  return `${y}-${String(m).padStart(2, "0")}`;
+}
+function monthId(y: number, m: number) {
+  return `month-${y}-${String(m).padStart(2, "0")}`;
+}
 
+function monthDiff(year: number, month: number) {
+  const now = new Date();
+  return (year - now.getFullYear()) * 12 + (month - (now.getMonth() + 1));
+}
+
+function getStoredMonthById(id: string) {
+  for (const [, s] of _months) if (s.month.id === id) return s;
+  return null;
+}
+
+// ── Core calculation — per-phase rate type ─────────────────────────────────
 function calcSummary(
-  rateType: RateType,
   phases: MealPhase[],
   entries: MealEntry[],
   shopping: ShoppingEntry[],
   deposits: DepositEntry[],
 ) {
   const totalShopping = shopping.reduce((s, e) => s + Number(e.amount), 0);
-
-  // Total meals = sum of all counts across all entries
   const totalMeals = entries.reduce(
     (s, e) => s + Object.values(e.counts).reduce((a, b) => a + b, 0),
     0,
   );
 
+  // Blended per-meal cost — used by dynamic phases
   const perMealCost =
-    rateType === "dynamic" && totalMeals > 0
-      ? +(totalShopping / totalMeals).toFixed(4)
-      : 0;
+    totalMeals > 0 ? +(totalShopping / totalMeals).toFixed(4) : 0;
 
   const memberSummary = MEMBERS.map((m) => {
-    const myEntries = entries.filter((e) => e.member_id === m.id);
-
     let myMeals = 0;
     let myCost = 0;
 
-    for (const e of myEntries) {
+    for (const e of entries.filter((e) => e.member_id === m.id)) {
       for (const [phaseId, count] of Object.entries(e.counts)) {
         myMeals += count;
-        if (rateType === "fixed") {
-          const phase = phases.find((p) => p.id === phaseId);
-          myCost += count * (phase?.rate ?? 0);
-        }
+        const phase = phases.find((p) => p.id === phaseId);
+        myCost +=
+          phase?.rate_type === "fixed"
+            ? count * phase.rate
+            : count * perMealCost;
       }
     }
-
-    if (rateType === "dynamic") myCost = +(myMeals * perMealCost).toFixed(2);
 
     const myDeposit = deposits
       .filter((d) => d.member_id === m.id)
       .reduce((s, d) => s + Number(d.amount), 0);
-    const balance = +(myCost - myDeposit).toFixed(2);
 
     return {
       ...m,
       total_meals: myMeals,
-      meal_cost: myCost,
+      meal_cost: +myCost.toFixed(2),
       total_deposit: myDeposit,
-      balance,
+      balance: +(myCost - myDeposit).toFixed(2),
     };
   });
 
@@ -152,44 +169,92 @@ function calcSummary(
   };
 }
 
-// ── fetchSheet ─────────────────────────────────────────────────────────────
+function buildSheet(
+  sub_mess_id: string,
+  year: number,
+  month: number,
+  phases: MealPhase[],
+  entries: MealEntry[],
+  shopping: ShoppingEntry[],
+  deposits: DepositEntry[],
+  status: "active" | "closed" = "active",
+): StoredMonth {
+  const { total_meals, total_shopping, per_meal_cost, member_summary } =
+    calcSummary(phases, entries, shopping, deposits);
+  return {
+    month: {
+      id: monthId(year, month),
+      sub_mess_id,
+      year,
+      month,
+      status,
+      phases: phases.map((p) => ({ ...p })),
+    },
+    members: MEMBERS.map((m) => ({ ...m })),
+    entries: entries.map((e) => ({ ...e, counts: { ...e.counts } })),
+    shopping: shopping.map((s) => ({ ...s })),
+    deposits: deposits.map((d) => ({ ...d })),
+    summary: { total_meals, total_shopping, per_meal_cost },
+    member_summary,
+  };
+}
+
+function snapshot(stored: StoredMonth): StoredMonth {
+  const { total_meals, total_shopping, per_meal_cost, member_summary } =
+    calcSummary(
+      stored.month.phases,
+      stored.entries,
+      stored.shopping,
+      stored.deposits,
+    );
+  return {
+    month: {
+      ...stored.month,
+      phases: stored.month.phases.map((p) => ({ ...p })),
+    },
+    members: stored.members.map((m) => ({ ...m })),
+    entries: stored.entries.map((e) => ({ ...e, counts: { ...e.counts } })),
+    shopping: stored.shopping.map((s) => ({ ...s })),
+    deposits: stored.deposits.map((d) => ({ ...d })),
+    summary: { total_meals, total_shopping, per_meal_cost },
+    member_summary,
+  };
+}
+
+function seedCurrentMonth(sub_mess_id: string, year: number, month: number) {
+  const now = new Date();
+  if (year !== now.getFullYear() || month !== now.getMonth() + 1) return null;
+  const key = monthKey(year, month);
+  if (_months.has(key)) return _months.get(key)!;
+  const s = buildSheet(
+    sub_mess_id,
+    year,
+    month,
+    DEFAULT_PHASES,
+    DEFAULT_ENTRIES,
+    DEFAULT_SHOPPING,
+    [],
+  );
+  _months.set(key, s);
+  return s;
+}
+
+// ── Public actions ─────────────────────────────────────────────────────────
 export async function fetchSheet(
   sub_mess_id: string,
   year: number,
   month: number,
 ): Promise<SheetData | null> {
   await delay();
+  const diff = monthDiff(year, month);
+  if (diff < -3 || diff > 3) return null;
 
-  const now = new Date();
-  if (
-    year > now.getFullYear() ||
-    (year === now.getFullYear() && month > now.getMonth() + 1)
-  )
-    return null;
-
-  const { total_meals, total_shopping, per_meal_cost, member_summary } =
-    calcSummary(_rateType, _phases, _entries, _shopping, _deposits);
-
-  return {
-    month: {
-      id: MONTH_ID,
-      sub_mess_id,
-      year,
-      month,
-      status: _monthStatus,
-      rate_type: _rateType,
-      phases: _phases,
-    },
-    members: MEMBERS,
-    entries: [..._entries],
-    shopping: [..._shopping],
-    deposits: [..._deposits],
-    summary: { total_meals, total_shopping, per_meal_cost },
-    member_summary,
-  };
+  const key = monthKey(year, month);
+  const existing =
+    _months.get(key) ?? seedCurrentMonth(sub_mess_id, year, month);
+  return existing ? snapshot(existing) : null;
 }
 
-// ── createMonth ────────────────────────────────────────────────────────────
 export async function createMonth(
   sub_mess_id: string,
   year: number,
@@ -197,63 +262,73 @@ export async function createMonth(
   payload: MonthCreatePayload,
 ): Promise<SheetData> {
   await delay(300);
+  const diff = monthDiff(year, month);
+  if (diff < 0 || diff > 3)
+    throw new Error("Cannot create a sheet for that month.");
 
-  // Save settings for "keep previous" on next month creation
-  _lastSettings = payload;
-
-  // Apply the new config and reset entries
-  _rateType = payload.rate_type;
-  _phases = payload.phases.map((p, i) => ({
+  const phases = payload.phases.map((p, i) => ({
     ...p,
-    id: `ph-${i}-${Date.now()}`,
+    id: `ph-${year}-${month}-${i}-${Date.now()}`,
   }));
-  _entries = [];
-  _monthStatus = "active";
 
-  const { total_meals, total_shopping, per_meal_cost, member_summary } =
-    calcSummary(_rateType, _phases, _entries, _shopping, _deposits);
-
-  return {
-    month: {
-      id: MONTH_ID,
-      sub_mess_id,
-      year,
-      month,
-      status: "active",
-      rate_type: _rateType,
-      phases: _phases,
-    },
-    members: MEMBERS,
-    entries: [],
-    shopping: [..._shopping],
-    deposits: [..._deposits],
-    summary: { total_meals, total_shopping, per_meal_cost },
-    member_summary,
-  };
+  const sheet = buildSheet(sub_mess_id, year, month, phases, [], [], []);
+  _months.set(monthKey(year, month), sheet);
+  _lastSettings = payload;
+  return snapshot(sheet);
 }
 
-// ── getPreviousSettings ────────────────────────────────────────────────────
+export async function updateMonthPhases(
+  monthId: string,
+  payload: MonthCreatePayload,
+): Promise<SheetData> {
+  await delay(250);
+  const stored = getStoredMonthById(monthId);
+  if (!stored) throw new Error("Month not found.");
+
+  const oldPhases = stored.month.phases;
+
+  // Preserve existing phase IDs where name matches (keeps entries intact)
+  stored.month.phases = payload.phases.map((p, i) => {
+    const existing = oldPhases.find((op) => op.name === p.name);
+    return { ...p, id: existing?.id ?? `ph-${Date.now()}-${i}` };
+  });
+
+  _lastSettings = payload;
+  return snapshot(stored);
+}
+
+export async function deleteMonth(monthId: string): Promise<void> {
+  await delay(200);
+  for (const [key, stored] of _months) {
+    if (stored.month.id === monthId) {
+      _months.delete(key);
+      return;
+    }
+  }
+}
+
 export async function getPreviousSettings(): Promise<MonthCreatePayload | null> {
   await delay(100);
   return _lastSettings;
 }
 
-// ── upsertMealEntry ────────────────────────────────────────────────────────
 export async function upsertMealEntry(body: {
   meal_month_id: string;
   member_id: string;
   day_number: number;
-  phase_id: string; // "total" for dynamic, actual phase.id for fixed
+  phase_id: string;
   count: number;
 }) {
   await delay(150);
-  const existing = _entries.find(
+  const stored = getStoredMonthById(body.meal_month_id);
+  if (!stored) throw new Error("Month not found.");
+  const e = stored.entries.find(
     (e) => e.member_id === body.member_id && e.day_number === body.day_number,
   );
-  if (existing) {
-    existing.counts = { ...existing.counts, [body.phase_id]: body.count };
+  if (e) {
+    e.counts = { ...e.counts, [body.phase_id]: body.count };
   } else {
-    _entries.push({
+    stored.entries.push({
       member_id: body.member_id,
       day_number: body.day_number,
       counts: { [body.phase_id]: body.count },
@@ -262,7 +337,6 @@ export async function upsertMealEntry(body: {
   return { success: true };
 }
 
-// ── Shopping ───────────────────────────────────────────────────────────────
 export async function addShoppingEntry(body: {
   meal_month_id: string;
   day_number: number;
@@ -270,6 +344,8 @@ export async function addShoppingEntry(body: {
   note?: string;
 }) {
   await delay(200);
+  const stored = getStoredMonthById(body.meal_month_id);
+  if (!stored) throw new Error("Month not found.");
   const entry: ShoppingEntry = {
     id: `sh-${Date.now()}`,
     day_number: body.day_number,
@@ -278,17 +354,41 @@ export async function addShoppingEntry(body: {
     added_by: MEMBER_1,
     created_at: new Date().toISOString(),
   };
-  _shopping.push(entry);
+  stored.shopping.push(entry);
   return { success: true, data: entry };
+}
+
+export async function updateShoppingEntry(body: {
+  id: string;
+  meal_month_id: string;
+  day_number: number;
+  amount: number;
+  note?: string;
+}) {
+  await delay(200);
+  const stored = getStoredMonthById(body.meal_month_id);
+  if (!stored) throw new Error("Month not found.");
+  const idx = stored.shopping.findIndex((s) => s.id === body.id);
+  if (idx === -1) throw new Error("Entry not found.");
+  stored.shopping[idx] = {
+    ...stored.shopping[idx],
+    day_number: body.day_number,
+    amount: String(body.amount),
+    note: body.note ?? null,
+  };
+  return { success: true };
 }
 
 export async function deleteShoppingEntry(id: string) {
   await delay(150);
-  _shopping = _shopping.filter((s) => s.id !== id);
+  for (const [, stored] of _months) {
+    const before = stored.shopping.length;
+    stored.shopping = stored.shopping.filter((s) => s.id !== id);
+    if (stored.shopping.length !== before) break;
+  }
   return { success: true };
 }
 
-// ── Deposits ───────────────────────────────────────────────────────────────
 export async function addDepositEntry(body: {
   meal_month_id: string;
   member_id: string;
@@ -296,6 +396,8 @@ export async function addDepositEntry(body: {
   note?: string;
 }) {
   await delay(200);
+  const stored = getStoredMonthById(body.meal_month_id);
+  if (!stored) throw new Error("Month not found.");
   const entry: DepositEntry = {
     id: `dep-${Date.now()}`,
     member_id: body.member_id,
@@ -304,12 +406,37 @@ export async function addDepositEntry(body: {
     added_by: MEMBER_1,
     created_at: new Date().toISOString(),
   };
-  _deposits.push(entry);
+  stored.deposits.push(entry);
   return { success: true, data: entry };
+}
+
+export async function updateDepositEntry(body: {
+  id: string;
+  meal_month_id: string;
+  member_id: string;
+  amount: number;
+  note?: string;
+}) {
+  await delay(200);
+  const stored = getStoredMonthById(body.meal_month_id);
+  if (!stored) throw new Error("Month not found.");
+  const idx = stored.deposits.findIndex((d) => d.id === body.id);
+  if (idx === -1) throw new Error("Deposit not found.");
+  stored.deposits[idx] = {
+    ...stored.deposits[idx],
+    member_id: body.member_id,
+    amount: String(body.amount),
+    note: body.note ?? null,
+  };
+  return { success: true };
 }
 
 export async function deleteDepositEntry(id: string) {
   await delay(150);
-  _deposits = _deposits.filter((d) => d.id !== id);
+  for (const [, stored] of _months) {
+    const before = stored.deposits.length;
+    stored.deposits = stored.deposits.filter((d) => d.id !== id);
+    if (stored.deposits.length !== before) break;
+  }
   return { success: true };
 }

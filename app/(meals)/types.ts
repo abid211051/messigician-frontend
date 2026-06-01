@@ -3,7 +3,8 @@ export type RateType = "dynamic" | "fixed";
 export interface MealPhase {
   id: string;
   name: string;
-  rate: number; // ৳/meal; 0 for dynamic (ignored in cost calc)
+  rate_type: RateType; // per-phase — no longer at sheet level
+  rate: number; // ৳/meal; ignored when rate_type is "dynamic"
   edit_start: string; // "HH:MM"
   edit_end: string; // "HH:MM"
 }
@@ -14,7 +15,7 @@ export interface MealMonth {
   year: number;
   month: number;
   status: "active" | "closed";
-  rate_type: RateType;
+  // rate_type removed — each phase now owns its own
   phases: MealPhase[];
 }
 
@@ -23,12 +24,10 @@ export interface MealMember {
   name: string;
 }
 
-// Dynamic: counts = { "total": N }          — one key
-// Fixed:   counts = { [phaseId]: N, ... }   — one key per phase
 export interface MealEntry {
   member_id: string;
   day_number: number;
-  counts: Record<string, number>;
+  counts: Record<string, number>; // phaseId → count
 }
 
 export interface ShoppingEntry {
@@ -55,7 +54,7 @@ export interface MemberSummary {
   total_meals: number;
   meal_cost: number;
   total_deposit: number;
-  balance: number; // positive = owes mess, negative = mess owes them
+  balance: number;
 }
 
 export interface SheetData {
@@ -67,13 +66,11 @@ export interface SheetData {
   summary: {
     total_meals: number;
     total_shopping: number;
-    per_meal_cost: number; // 0 when fixed rate (not applicable)
+    per_meal_cost: number; // total_shopping / total_meals — used by dynamic phases
   };
   member_summary: MemberSummary[];
 }
 
-// Payload for StartMonthDialog → createMonth action
 export interface MonthCreatePayload {
-  rate_type: RateType;
   phases: Omit<MealPhase, "id">[];
 }

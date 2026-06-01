@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Trash2, Plus, Pencil } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -18,7 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { handleApiError } from "@/lib/helpers/errors";
-import { addDepositEntry, deleteDepositEntry } from "@/app/(meals)/actions";
+import {
+  addDepositEntry,
+  deleteDepositEntry,
+  updateDepositEntry,
+} from "@/app/(meals)/actions";
 import type { DepositEntry, MealMember } from "@/app/(meals)/types";
 
 interface Props {
@@ -41,21 +45,47 @@ export default function DepositPanel({
   const [memberId, setMemberId] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const handleAdd = async () => {
+  const resetForm = () => {
+    setEditingId(null);
+    setMemberId("");
+    setAmount("");
+    setNote("");
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setEditingId(null);
+      setMemberId("");
+      setAmount("");
+      setNote("");
+    }
+  }, [open]);
+
+  const handleSubmit = async () => {
     const parsedAmount = parseFloat(amount);
     if (!memberId || !parsedAmount || parsedAmount <= 0) return;
     setSaving(true);
     try {
-      await addDepositEntry({
-        meal_month_id: monthId,
-        member_id: memberId,
-        amount: parsedAmount,
-        note: note.trim() || undefined,
-      });
-      setAmount("");
-      setNote("");
+      if (editingId) {
+        await updateDepositEntry({
+          id: editingId,
+          meal_month_id: monthId,
+          member_id: memberId,
+          amount: parsedAmount,
+          note: note.trim() || undefined,
+        });
+      } else {
+        await addDepositEntry({
+          meal_month_id: monthId,
+          member_id: memberId,
+          amount: parsedAmount,
+          note: note.trim() || undefined,
+        });
+      }
+      resetForm();
       onRefresh();
     } catch (err) {
       handleApiError(err);
@@ -71,6 +101,13 @@ export default function DepositPanel({
     } catch (err) {
       handleApiError(err);
     }
+  };
+
+  const handleEdit = (entry: DepositEntry) => {
+    setEditingId(entry.id);
+    setMemberId(entry.member_id);
+    setAmount(entry.amount);
+    setNote(entry.note ?? "");
   };
 
   // Group deposits by member for display
@@ -137,12 +174,23 @@ export default function DepositPanel({
           <Button
             size="sm"
             disabled={!memberId || !amount || parseFloat(amount) <= 0 || saving}
-            onClick={handleAdd}
+            onClick={handleSubmit}
             className="h-9 rounded-xl gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
-            Add Deposit
+            {editingId ? "Update Deposit" : "Add Deposit"}
           </Button>
+          {editingId && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={resetForm}
+              className="h-8 rounded-xl text-xs text-gray-500"
+            >
+              Cancel edit
+            </Button>
+          )}
         </div>
 
         {/* Deposits list — grouped by member */}
@@ -182,12 +230,22 @@ export default function DepositPanel({
                         {new Date(d.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleDelete(d.id)}
-                      className="w-6 h-6 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 active:scale-95 transition-all shrink-0"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleEdit(d)}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg text-blue-500 hover:bg-blue-50 active:scale-95 transition-all"
+                        aria-label="Edit deposit entry"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(d.id)}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 active:scale-95 transition-all"
+                        aria-label="Delete deposit entry"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -1,8 +1,8 @@
 // ── shopping-panel.tsx ────────────────────────────────────────────────────
 "use client";
 
-import { useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Trash2, Plus, Pencil } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -13,7 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumericInput } from "@/components/reusable/numeric-field";
 import { handleApiError } from "@/lib/helpers/errors";
-import { addShoppingEntry, deleteShoppingEntry } from "@/app/(meals)/actions";
+import {
+  addShoppingEntry,
+  deleteShoppingEntry,
+  updateShoppingEntry,
+} from "@/app/(meals)/actions";
 import type { ShoppingEntry } from "@/app/(meals)/types";
 
 interface Props {
@@ -36,20 +40,46 @@ export default function ShoppingPanel({
   const [day, setDay] = useState<number | undefined>(today);
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [note, setNote] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const handleAdd = async () => {
+  const resetForm = () => {
+    setEditingId(null);
+    setDay(today);
+    setAmount(undefined);
+    setNote("");
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setEditingId(null);
+      setDay(today);
+      setAmount(undefined);
+      setNote("");
+    }
+  }, [open, today]);
+
+  const handleSubmit = async () => {
     if (!day || !amount) return;
     setSaving(true);
     try {
-      await addShoppingEntry({
-        meal_month_id: monthId,
-        day_number: day,
-        amount,
-        note: note || undefined,
-      });
-      setAmount(undefined);
-      setNote("");
+      if (editingId) {
+        await updateShoppingEntry({
+          id: editingId,
+          meal_month_id: monthId,
+          day_number: day,
+          amount,
+          note: note || undefined,
+        });
+      } else {
+        await addShoppingEntry({
+          meal_month_id: monthId,
+          day_number: day,
+          amount,
+          note: note || undefined,
+        });
+      }
+      resetForm();
       onRefresh();
     } catch (err) {
       handleApiError(err);
@@ -65,6 +95,13 @@ export default function ShoppingPanel({
     } catch (err) {
       handleApiError(err);
     }
+  };
+
+  const handleEdit = (entry: ShoppingEntry) => {
+    setEditingId(entry.id);
+    setDay(entry.day_number);
+    setAmount(Number(entry.amount));
+    setNote(entry.note ?? "");
   };
 
   // Group shopping entries by day for display
@@ -130,12 +167,23 @@ export default function ShoppingPanel({
           <Button
             size="sm"
             disabled={!day || !amount || saving}
-            onClick={handleAdd}
+            onClick={handleSubmit}
             className="h-9 rounded-xl gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
-            Add Entry
+            {editingId ? "Update Entry" : "Add Entry"}
           </Button>
+          {editingId && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={resetForm}
+              className="h-8 rounded-xl text-xs text-gray-500"
+            >
+              Cancel edit
+            </Button>
+          )}
         </div>
 
         {/* Entries list */}
@@ -167,12 +215,22 @@ export default function ShoppingPanel({
                           </p>
                         )}
                       </div>
-                      <button
-                        onClick={() => handleDelete(e.id)}
-                        className="w-6 h-6 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 active:scale-95 transition-all shrink-0"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => handleEdit(e)}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg text-blue-500 hover:bg-blue-50 active:scale-95 transition-all"
+                          aria-label="Edit shopping entry"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(e.id)}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 active:scale-95 transition-all"
+                          aria-label="Delete shopping entry"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
