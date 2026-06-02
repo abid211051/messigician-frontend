@@ -16,7 +16,7 @@ interface Props {
   ) => void;
 }
 
-function hhMM(): string {
+function currentHHMM(): string {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
@@ -28,7 +28,7 @@ export default function MealSheet({
   onCellChange,
 }: Props) {
   const { month, members, entries, shopping } = data;
-  const { phases, status } = month;
+  const { phases, status, rate_type } = month; // rate_type is sheet-level
   const now = new Date();
   const isThisMonth =
     now.getFullYear() === month.year && now.getMonth() + 1 === month.month;
@@ -37,9 +37,9 @@ export default function MealSheet({
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const isClosed = status === "closed";
 
-  // Whether each phase's edit window is currently open — computed once per render
+  // Per-phase edit-window open/closed — computed once per render
   const phaseWindowMap = useMemo(() => {
-    const t = hhMM();
+    const t = currentHHMM();
     return Object.fromEntries(
       phases.map((p) => [
         p.id,
@@ -48,6 +48,7 @@ export default function MealSheet({
     );
   }, [phases, isClosed]);
 
+  // "memberId-day-phaseId" → count
   const entryMap = useMemo(() => {
     const m: Record<string, number> = {};
     for (const e of entries)
@@ -56,6 +57,7 @@ export default function MealSheet({
     return m;
   }, [entries]);
 
+  // Total meals per member across all days (for totals row)
   const memberTotals = useMemo(() => {
     const t: Record<string, number> = {};
     for (const e of entries)
@@ -65,8 +67,9 @@ export default function MealSheet({
     return t;
   }, [entries]);
 
+  // Total meals per member per phase (for totals row in fixed layout)
   const phaseTotals = useMemo(() => {
-    const t: Record<string, number> = {};
+    const t: Record<string, number> = {}; // "memberId-phaseId"
     for (const e of entries)
       for (const [pId, cnt] of Object.entries(e.counts)) {
         const k = `${e.member_id}-${pId}`;
@@ -85,12 +88,13 @@ export default function MealSheet({
   const STICKY = "sticky left-0 z-10";
   const HDR = "text-[10px] font-semibold text-gray-500 uppercase tracking-wide";
   const CELL_W = "min-w-[52px]";
+  const TODAY_BG = "bg-blue-50/40";
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white mb-3">
       <table className="border-collapse text-xs w-full">
         <thead>
-          {/* Row 1: Day | Member names (colSpan=phases.length) | Shop */}
+          {/* Row 1: Day | Member names (colSpan = phases.length) | Shop */}
           <tr className="border-b border-gray-100 bg-gray-50/60">
             <th
               className={`${STICKY} bg-gray-50/60 px-2 py-2.5 text-left ${HDR} border-r border-gray-100 min-w-[44px]`}
@@ -113,7 +117,7 @@ export default function MealSheet({
             </th>
           </tr>
 
-          {/* Row 2: Phase names + rate indicator */}
+          {/* Row 2: Phase names + rate indicator (rate shown only in fixed mode) */}
           <tr className="border-b border-gray-100 bg-gray-50/30">
             <th
               className={`${STICKY} bg-gray-50/30 px-2 py-1 border-r border-gray-100`}
@@ -126,13 +130,14 @@ export default function MealSheet({
                     pi === phases.length - 1 ? "border-r border-gray-100" : ""
                   }`}
                   title={
-                    p.rate_type === "fixed"
+                    rate_type === "fixed"
                       ? `${p.name} · ৳${p.rate}/meal (fixed)`
                       : `${p.name} (dynamic)`
                   }
                 >
                   {p.name.slice(0, 3)}
-                  {p.rate_type === "fixed" && (
+                  {/* Rate indicator only meaningful in fixed mode */}
+                  {rate_type === "fixed" && (
                     <span className="ml-0.5 text-gray-300">·{p.rate}</span>
                   )}
                 </th>
@@ -148,11 +153,13 @@ export default function MealSheet({
             return (
               <tr
                 key={day}
-                className={`border-b border-gray-50 last:border-b-0 ${isToday ? "bg-blue-50/30" : ""}`}
+                className={`border-b border-gray-50 last:border-b-0 ${isToday ? TODAY_BG : ""}`}
               >
                 {/* Day label */}
                 <td
-                  className={`${STICKY} ${isToday ? "bg-blue-50/30" : "bg-white"} px-2 py-0.5 border-r border-gray-100 font-medium whitespace-nowrap text-gray-600 ${isToday ? "text-blue-600" : ""}`}
+                  className={`${STICKY} px-2 py-0.5 border-r border-gray-100 font-medium whitespace-nowrap text-gray-600 ${
+                    isToday ? `${TODAY_BG} text-blue-600` : "bg-white"
+                  }`}
                 >
                   {day}
                   {isToday && (
@@ -171,10 +178,12 @@ export default function MealSheet({
                       (m.id === currentUserId &&
                         isToday &&
                         phaseWindowMap[p.id]);
+                    const isLastPhase = pi === phases.length - 1;
+
                     return (
                       <td
                         key={`${m.id}-${p.id}`}
-                        className={`p-0 ${pi === phases.length - 1 ? "border-r border-gray-100" : ""} ${isToday ? "bg-blue-50/30" : ""}`}
+                        className={`p-0 ${isLastPhase ? "border-r border-gray-100" : ""} ${isToday ? TODAY_BG : ""}`}
                       >
                         <MealCell
                           monthId={month.id}
@@ -191,9 +200,9 @@ export default function MealSheet({
                   }),
                 )}
 
-                {/* Shopping */}
+                {/* Shopping total for the day */}
                 <td
-                  className={`px-1.5 py-1.5 text-center text-gray-600 tabular-nums ${isToday ? "bg-blue-50/30" : ""}`}
+                  className={`px-1.5 py-1.5 text-center text-gray-600 tabular-nums ${isToday ? TODAY_BG : ""}`}
                 >
                   {shoppingByDay[day] ? (
                     shoppingByDay[day].toLocaleString()
@@ -213,14 +222,19 @@ export default function MealSheet({
               Total
             </td>
             {members.flatMap((m) =>
-              phases.map((p, pi) => (
-                <td
-                  key={`${m.id}-${p.id}`}
-                  className={`text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs ${pi === phases.length - 1 ? "border-r border-gray-100" : ""}`}
-                >
-                  {phaseTotals[`${m.id}-${p.id}`] ?? 0}
-                </td>
-              )),
+              phases.map((p, pi) => {
+                const isLastPhase = pi === phases.length - 1;
+                return (
+                  <td
+                    key={`${m.id}-${p.id}`}
+                    className={`text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs ${
+                      isLastPhase ? "border-r border-gray-100" : ""
+                    }`}
+                  >
+                    {phaseTotals[`${m.id}-${p.id}`] ?? 0}
+                  </td>
+                );
+              }),
             )}
             <td className="text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs">
               {Object.values(shoppingByDay)

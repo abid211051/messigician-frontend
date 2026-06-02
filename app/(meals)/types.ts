@@ -3,10 +3,10 @@ export type RateType = "dynamic" | "fixed";
 export interface MealPhase {
   id: string;
   name: string;
-  rate_type: RateType; // per-phase — no longer at sheet level
-  rate: number; // ৳/meal; ignored when rate_type is "dynamic"
+  rate: number; // ৳/meal — used only when sheet rate_type is "fixed"
   edit_start: string; // "HH:MM"
   edit_end: string; // "HH:MM"
+  // rate_type intentionally NOT here — the sheet owns this decision
 }
 
 export interface MealMonth {
@@ -15,7 +15,7 @@ export interface MealMonth {
   year: number;
   month: number;
   status: "active" | "closed";
-  // rate_type removed — each phase now owns its own
+  rate_type: RateType; // one decision for the whole sheet
   phases: MealPhase[];
 }
 
@@ -24,10 +24,13 @@ export interface MealMember {
   name: string;
 }
 
+// counts keys:
+//   dynamic sheet → phaseId (e.g. "ph-lunch")
+//   fixed sheet   → phaseId (same — no special "total" key)
 export interface MealEntry {
   member_id: string;
   day_number: number;
-  counts: Record<string, number>; // phaseId → count
+  counts: Record<string, number>;
 }
 
 export interface ShoppingEntry {
@@ -54,7 +57,7 @@ export interface MemberSummary {
   total_meals: number;
   meal_cost: number;
   total_deposit: number;
-  balance: number;
+  balance: number; // positive = owes mess, negative = mess owes them
 }
 
 export interface SheetData {
@@ -66,11 +69,12 @@ export interface SheetData {
   summary: {
     total_meals: number;
     total_shopping: number;
-    per_meal_cost: number; // total_shopping / total_meals — used by dynamic phases
+    per_meal_cost: number; // meaningful only when rate_type === "dynamic"
   };
   member_summary: MemberSummary[];
 }
 
 export interface MonthCreatePayload {
+  rate_type: RateType; // sheet-level
   phases: Omit<MealPhase, "id">[];
 }

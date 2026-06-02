@@ -37,7 +37,6 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const newEmptyPhase = (): MealPhase => ({
   id: uid(),
   name: "",
-  rate_type: "dynamic",
   rate: 0,
   edit_start: "07:00",
   edit_end: "11:00",
@@ -49,9 +48,9 @@ interface Props {
   year: number;
   month: number;
   mode: "create" | "edit";
-  // Create: starts empty; edit: pre-populated with current phases
-  initialPhases?: MealPhase[];
-  previousSettings?: MonthCreatePayload | null;
+  initialRateType?: RateType; // pre-fill in edit mode
+  initialPhases?: MealPhase[]; // pre-fill in edit mode
+  previousSettings?: MonthCreatePayload | null; // "keep previous" in create mode
   isLoading?: boolean;
   onSubmit: (payload: MonthCreatePayload) => void;
 }
@@ -62,27 +61,37 @@ export default function StartMonthDialog({
   year,
   month,
   mode,
+  initialRateType,
   initialPhases,
   previousSettings,
   isLoading = false,
   onSubmit,
 }: Props) {
-  const buildInitial = (): MealPhase[] => {
-    if (mode === "edit" && initialPhases?.length) {
-      return initialPhases.map((p) => ({ ...p, id: uid() }));
-    }
-    return []; // create mode always starts empty
-  };
+  const buildInitial = () => ({
+    rateType: (mode === "edit" && initialRateType
+      ? initialRateType
+      : "dynamic") as RateType,
+    phases:
+      mode === "edit" && initialPhases?.length
+        ? initialPhases.map((p) => ({ ...p, id: uid() }))
+        : [],
+  });
 
-  const [phases, setPhases] = useState<MealPhase[]>(buildInitial);
+  const [rateType, setRateType] = useState<RateType>(buildInitial().rateType);
+  const [phases, setPhases] = useState<MealPhase[]>(buildInitial().phases);
 
-  // Re-initialise whenever the dialog opens
+  // Re-initialise when the dialog opens so stale state never leaks through
   useEffect(() => {
-    if (open) setPhases(buildInitial());
+    if (open) {
+      const init = buildInitial();
+      setRateType(init.rateType);
+      setPhases(init.phases);
+    }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const keepPrevious = () => {
     if (!previousSettings) return;
+    setRateType(previousSettings.rate_type);
     setPhases(previousSettings.phases.map((p) => ({ ...p, id: uid() })));
   };
 
@@ -100,29 +109,29 @@ export default function StartMonthDialog({
       prev.map((p) => (p.id === id ? { ...p, [key]: val } : p)),
     );
 
-  const isValid =
-    phases.length > 0 &&
-    phases.every((p) => p.name.trim()) &&
-    phases.every((p) => p.rate_type === "dynamic" || p.rate > 0);
+  const isFixed = rateType === "fixed";
+
+  // Save is disabled until ≥1 phase; fixed mode also requires every rate to be set (≥0 is fine — free phase)
+  const isValid = phases.length > 0 && phases.every((p) => p.name.trim());
 
   const handleSubmit = () => {
     if (!isValid) return;
     onSubmit({
+      rate_type: rateType,
       phases: phases.map(({ id: _id, ...rest }) => rest),
     });
   };
 
   const isCreate = mode === "create";
-  const title = isCreate
-    ? `Start ${MONTH_NAMES[month - 1]} ${year}`
-    : `Edit Sheet — ${MONTH_NAMES[month - 1]} ${year}`;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="sm:max-w-md w-[calc(100vw-2rem)] rounded-2xl max-h-[90vh] flex flex-col gap-0 p-0">
         <AlertDialogHeader className="px-5 pt-5 pb-3 border-b border-gray-100">
           <AlertDialogTitle className="text-base font-bold">
-            {title}
+            {isCreate
+              ? `Start ${MONTH_NAMES[month - 1]} ${year}`
+              : `Edit Sheet — ${MONTH_NAMES[month - 1]} ${year}`}
           </AlertDialogTitle>
           {isCreate && (
             <p className="text-xs text-gray-400 mt-0.5">
@@ -131,21 +140,63 @@ export default function StartMonthDialog({
           )}
         </AlertDialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-          {/* Keep previous (create mode only) */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+          {/* Keep previous settings (create mode only) */}
           {isCreate && previousSettings && (
             <button
               onClick={keepPrevious}
               className="w-full text-xs text-left font-medium text-brand-primary border border-brand-primary/25 bg-brand-primary/4 rounded-xl px-3.5 py-2.5 hover:bg-brand-primary/8 transition-colors"
             >
-              ↩ Keep previous month's settings
+              ↩ Keep previous month&apos;s settings
               <span className="ml-1 text-gray-400 font-normal">
-                ({previousSettings.phases.length} phases)
+                ({previousSettings.rate_type}, {previousSettings.phases.length}{" "}
+                phases)
               </span>
             </button>
           )}
 
-          {/* Phase list */}
+          {/* ── Sheet-level rate type ─────────────────────────── */}
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+              Meal Rate Type
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                {
+                  type: "dynamic" as RateType,
+                  label: "Dynamic",
+                  desc: "Cost = Total Shopping ÷ Total Meals",
+                },
+                {
+                  type: "fixed" as RateType,
+                  label: "Fixed",
+                  desc: "Set a ৳ rate per meal for each phase",
+                },
+              ].map(({ type, label, desc }) => (
+                <button
+                  key={type}
+                  onClick={() => setRateType(type)}
+                  className={`px-3.5 py-3 rounded-xl border text-left transition-all ${
+                    rateType === type
+                      ? "border-brand-primary bg-brand-primary/5 text-brand-primary"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300 bg-white"
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{label}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5 leading-tight font-normal">
+                    {desc}
+                  </p>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
+              {isFixed
+                ? "All phases use fixed rates. Set ৳ 0 for any phase that is free."
+                : "All phases share the shopping pool. One rate is calculated and applied to every meal."}
+            </p>
+          </div>
+
+          {/* ── Phase list ─────────────────────────────────────── */}
           <div>
             <div className="flex items-center justify-between mb-2.5">
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
@@ -180,44 +231,25 @@ export default function StartMonthDialog({
                   key={phase.id}
                   className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 flex flex-col gap-2"
                 >
-                  {/* Row 1: Name | Rate type | Rate input | Delete */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Row 1: Name | Rate input (fixed only) | Delete */}
+                  <div className="flex items-center gap-1.5">
                     <Input
                       value={phase.name}
                       onChange={(e) => update(phase.id, "name", e.target.value)}
-                      placeholder="Name (e.g. Lunch)"
-                      className="h-8 text-sm flex-1 min-w-[100px] rounded-lg"
+                      placeholder="Phase name (e.g. Lunch)"
+                      className="h-8 text-sm flex-1 rounded-lg"
                     />
 
-                    {/* Rate type toggle */}
-                    <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden shrink-0 h-8">
-                      {(["dynamic", "fixed"] as RateType[]).map((type, i) => (
-                        <button
-                          key={type}
-                          onClick={() => update(phase.id, "rate_type", type)}
-                          className={`px-2 py-1 text-[10px] font-semibold h-full transition-colors ${
-                            i > 0 ? "border-l border-gray-200" : ""
-                          } ${
-                            phase.rate_type === type
-                              ? "bg-brand-primary text-white"
-                              : "bg-white text-gray-500 hover:bg-gray-50"
-                          }`}
-                        >
-                          {type === "dynamic" ? "Dynamic" : "Fixed"}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Rate input — only when fixed */}
-                    {phase.rate_type === "fixed" && (
-                      <div className="relative w-16 shrink-0">
+                    {/* Rate input — only visible in fixed mode */}
+                    {isFixed && (
+                      <div className="relative w-20 shrink-0">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">
                           ৳
                         </span>
                         <Input
                           type="number"
                           min={0}
-                          value={phase.rate || ""}
+                          value={phase.rate === 0 ? "" : phase.rate}
                           onChange={(e) =>
                             update(
                               phase.id,

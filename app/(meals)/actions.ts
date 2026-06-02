@@ -4,9 +4,11 @@ import type {
   ShoppingEntry,
   DepositEntry,
   MealPhase,
+  RateType,
   MonthCreatePayload,
 } from "./types";
 
+// ── Stable mock member IDs ─────────────────────────────────────────────────
 const MEMBER_1 = "bbbbbbbb-0000-0000-0000-000000000001";
 const MEMBER_2 = "bbbbbbbb-0000-0000-0000-000000000002";
 const MEMBER_3 = "bbbbbbbb-0000-0000-0000-000000000003";
@@ -17,13 +19,12 @@ const MEMBERS = [
   { id: MEMBER_3, name: "Karim Hossain" },
 ];
 
-let _lastSettings: MonthCreatePayload | null = null;
-
+// ── Default seed data (dynamic mode) ──────────────────────────────────────
+// Note: MealPhase has NO rate_type — that lives on the sheet
 const DEFAULT_PHASES: MealPhase[] = [
   {
     id: "ph-lunch",
     name: "Lunch",
-    rate_type: "dynamic",
     rate: 0,
     edit_start: "07:00",
     edit_end: "11:00",
@@ -31,14 +32,12 @@ const DEFAULT_PHASES: MealPhase[] = [
   {
     id: "ph-dinner",
     name: "Dinner",
-    rate_type: "dynamic",
     rate: 0,
     edit_start: "18:00",
     edit_end: "22:00",
   },
 ];
 
-// Seed entries use real phase IDs (not "total")
 const DEFAULT_ENTRIES: MealEntry[] = [
   {
     member_id: MEMBER_1,
@@ -92,18 +91,22 @@ const DEFAULT_SHOPPING: ShoppingEntry[] = [
   },
 ];
 
+// ── In-memory store ────────────────────────────────────────────────────────
 type StoredMonth = SheetData;
 const _months = new Map<string, StoredMonth>();
+let _lastSettings: MonthCreatePayload | null = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function delay(ms = 300) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
-function monthKey(y: number, m: number) {
-  return `${y}-${String(m).padStart(2, "0")}`;
+
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
-function monthId(y: number, m: number) {
-  return `month-${y}-${String(m).padStart(2, "0")}`;
+
+function monthId(year: number, month: number) {
+  return `month-${year}-${String(month).padStart(2, "0")}`;
 }
 
 function monthDiff(year: number, month: number) {
@@ -111,13 +114,15 @@ function monthDiff(year: number, month: number) {
   return (year - now.getFullYear()) * 12 + (month - (now.getMonth() + 1));
 }
 
-function getStoredMonthById(id: string) {
+function getStoredMonthById(id: string): StoredMonth | null {
   for (const [, s] of _months) if (s.month.id === id) return s;
   return null;
 }
 
-// ── Core calculation — per-phase rate type ─────────────────────────────────
+// ── Core calculation ───────────────────────────────────────────────────────
+// rate_type is sheet-level — no per-phase rate_type
 function calcSummary(
+  rateType: RateType,
   phases: MealPhase[],
   entries: MealEntry[],
   shopping: ShoppingEntry[],
@@ -129,9 +134,12 @@ function calcSummary(
     0,
   );
 
-  // Blended per-meal cost — used by dynamic phases
+  // Dynamic: shopping ÷ ALL meals — clean, no leakage
+  // Fixed:   per_meal_cost is 0 — individual costs come entirely from phase rates
   const perMealCost =
-    totalMeals > 0 ? +(totalShopping / totalMeals).toFixed(4) : 0;
+    rateType === "dynamic" && totalMeals > 0
+      ? +(totalShopping / totalMeals).toFixed(4)
+      : 0;
 
   const memberSummary = MEMBERS.map((m) => {
     let myMeals = 0;
@@ -140,11 +148,12 @@ function calcSummary(
     for (const e of entries.filter((e) => e.member_id === m.id)) {
       for (const [phaseId, count] of Object.entries(e.counts)) {
         myMeals += count;
-        const phase = phases.find((p) => p.id === phaseId);
-        myCost +=
-          phase?.rate_type === "fixed"
-            ? count * phase.rate
-            : count * perMealCost;
+        if (rateType === "fixed") {
+          const phase = phases.find((p) => p.id === phaseId);
+          myCost += count * (phase?.rate ?? 0);
+        } else {
+          myCost += count * perMealCost;
+        }
       }
     }
 
@@ -173,6 +182,7 @@ function buildSheet(
   sub_mess_id: string,
   year: number,
   month: number,
+  rateType: RateType,
   phases: MealPhase[],
   entries: MealEntry[],
   shopping: ShoppingEntry[],
@@ -180,7 +190,7 @@ function buildSheet(
   status: "active" | "closed" = "active",
 ): StoredMonth {
   const { total_meals, total_shopping, per_meal_cost, member_summary } =
-    calcSummary(phases, entries, shopping, deposits);
+    calcSummary(rateType, phases, entries, shopping, deposits);
   return {
     month: {
       id: monthId(year, month),
@@ -188,6 +198,7 @@ function buildSheet(
       year,
       month,
       status,
+      rate_type: rateType,
       phases: phases.map((p) => ({ ...p })),
     },
     members: MEMBERS.map((m) => ({ ...m })),
@@ -202,6 +213,7 @@ function buildSheet(
 function snapshot(stored: StoredMonth): StoredMonth {
   const { total_meals, total_shopping, per_meal_cost, member_summary } =
     calcSummary(
+      stored.month.rate_type,
       stored.month.phases,
       stored.entries,
       stored.shopping,
@@ -230,6 +242,7 @@ function seedCurrentMonth(sub_mess_id: string, year: number, month: number) {
     sub_mess_id,
     year,
     month,
+    "dynamic",
     DEFAULT_PHASES,
     DEFAULT_ENTRIES,
     DEFAULT_SHOPPING,
@@ -240,6 +253,7 @@ function seedCurrentMonth(sub_mess_id: string, year: number, month: number) {
 }
 
 // ── Public actions ─────────────────────────────────────────────────────────
+
 export async function fetchSheet(
   sub_mess_id: string,
   year: number,
@@ -252,7 +266,11 @@ export async function fetchSheet(
   const key = monthKey(year, month);
   const existing =
     _months.get(key) ?? seedCurrentMonth(sub_mess_id, year, month);
-  return existing ? snapshot(existing) : null;
+  if (existing) {
+    existing.month.sub_mess_id = sub_mess_id;
+    return snapshot(existing);
+  }
+  return null;
 }
 
 export async function createMonth(
@@ -262,8 +280,7 @@ export async function createMonth(
   payload: MonthCreatePayload,
 ): Promise<SheetData> {
   await delay(300);
-  const diff = monthDiff(year, month);
-  if (diff < 0 || diff > 3)
+  if (monthDiff(year, month) < 0 || monthDiff(year, month) > 3)
     throw new Error("Cannot create a sheet for that month.");
 
   const phases = payload.phases.map((p, i) => ({
@@ -271,7 +288,16 @@ export async function createMonth(
     id: `ph-${year}-${month}-${i}-${Date.now()}`,
   }));
 
-  const sheet = buildSheet(sub_mess_id, year, month, phases, [], [], []);
+  const sheet = buildSheet(
+    sub_mess_id,
+    year,
+    month,
+    payload.rate_type,
+    phases,
+    [],
+    [],
+    [],
+  );
   _months.set(monthKey(year, month), sheet);
   _lastSettings = payload;
   return snapshot(sheet);
@@ -287,7 +313,8 @@ export async function updateMonthPhases(
 
   const oldPhases = stored.month.phases;
 
-  // Preserve existing phase IDs where name matches (keeps entries intact)
+  // Preserve IDs for phases with the same name so existing entries survive
+  stored.month.rate_type = payload.rate_type;
   stored.month.phases = payload.phases.map((p, i) => {
     const existing = oldPhases.find((op) => op.name === p.name);
     return { ...p, id: existing?.id ?? `ph-${Date.now()}-${i}` };
@@ -322,11 +349,12 @@ export async function upsertMealEntry(body: {
   await delay(150);
   const stored = getStoredMonthById(body.meal_month_id);
   if (!stored) throw new Error("Month not found.");
-  const e = stored.entries.find(
+
+  const existing = stored.entries.find(
     (e) => e.member_id === body.member_id && e.day_number === body.day_number,
   );
-  if (e) {
-    e.counts = { ...e.counts, [body.phase_id]: body.count };
+  if (existing) {
+    existing.counts = { ...existing.counts, [body.phase_id]: body.count };
   } else {
     stored.entries.push({
       member_id: body.member_id,
@@ -346,6 +374,7 @@ export async function addShoppingEntry(body: {
   await delay(200);
   const stored = getStoredMonthById(body.meal_month_id);
   if (!stored) throw new Error("Month not found.");
+
   const entry: ShoppingEntry = {
     id: `sh-${Date.now()}`,
     day_number: body.day_number,
@@ -368,8 +397,9 @@ export async function updateShoppingEntry(body: {
   await delay(200);
   const stored = getStoredMonthById(body.meal_month_id);
   if (!stored) throw new Error("Month not found.");
+
   const idx = stored.shopping.findIndex((s) => s.id === body.id);
-  if (idx === -1) throw new Error("Entry not found.");
+  if (idx === -1) throw new Error("Shopping entry not found.");
   stored.shopping[idx] = {
     ...stored.shopping[idx],
     day_number: body.day_number,
@@ -398,6 +428,7 @@ export async function addDepositEntry(body: {
   await delay(200);
   const stored = getStoredMonthById(body.meal_month_id);
   if (!stored) throw new Error("Month not found.");
+
   const entry: DepositEntry = {
     id: `dep-${Date.now()}`,
     member_id: body.member_id,
@@ -420,6 +451,7 @@ export async function updateDepositEntry(body: {
   await delay(200);
   const stored = getStoredMonthById(body.meal_month_id);
   if (!stored) throw new Error("Month not found.");
+
   const idx = stored.deposits.findIndex((d) => d.id === body.id);
   if (idx === -1) throw new Error("Deposit not found.");
   stored.deposits[idx] = {

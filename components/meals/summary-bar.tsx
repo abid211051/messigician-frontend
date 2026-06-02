@@ -1,9 +1,9 @@
 "use client";
 
-import type { MealPhase, MemberSummary } from "@/app/(meals)/types";
+import type { MemberSummary, RateType } from "@/app/(meals)/types";
 
 interface Props {
-  phases: MealPhase[];
+  rateType: RateType;
   summary: {
     total_meals: number;
     total_shopping: number;
@@ -14,37 +14,35 @@ interface Props {
 }
 
 export default function SummaryBar({
-  phases,
+  rateType,
   summary,
   memberSummary,
   currentUserId,
 }: Props) {
   const { total_meals, total_shopping, per_meal_cost } = summary;
-  const hasDynamic = phases.some((p) => p.rate_type === "dynamic");
-  const hasFixed = phases.some((p) => p.rate_type === "fixed");
-
-  const perMealDisplay = !hasDynamic
-    ? "Fixed Rate"
-    : per_meal_cost > 0
-      ? `৳ ${per_meal_cost.toFixed(2)}${hasFixed ? "*" : ""}`
-      : "—";
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white overflow-hidden mb-3">
+      {/* Month-level stats */}
       <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
         <Stat label="Total Meals" value={String(total_meals)} />
         <Stat
           label="Total Shopping"
           value={`৳ ${total_shopping.toLocaleString()}`}
         />
-        <Stat label="Per Meal" value={perMealDisplay} />
+        <Stat
+          label="Per Meal"
+          value={
+            rateType === "fixed"
+              ? "Fixed Rate"
+              : per_meal_cost > 0
+                ? `৳ ${per_meal_cost.toFixed(2)}`
+                : "—"
+          }
+        />
       </div>
-      {hasFixed && hasDynamic && (
-        <p className="text-[10px] text-gray-400 px-3 py-1.5 border-b border-gray-50">
-          * Dynamic rate — fixed-rate phases use their own rate
-        </p>
-      )}
 
+      {/* Per-member breakdown */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
@@ -103,6 +101,7 @@ export default function SummaryBar({
             })}
           </tbody>
         </table>
+
         <div className="flex items-center gap-4 px-3 py-2 border-t border-gray-50 bg-gray-50/40">
           <span className="text-[10px] text-gray-400">
             <span className="text-red-400 font-semibold">+৳</span> = owes the
