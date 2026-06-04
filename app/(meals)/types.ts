@@ -36,6 +36,7 @@ export interface MealEntry {
 export interface ShoppingEntry {
   id: string;
   day_number: number;
+  entry_date: string; // YYYY-MM-DD
   amount: string;
   note: string | null;
   added_by: string;
@@ -45,6 +46,7 @@ export interface ShoppingEntry {
 export interface DepositEntry {
   id: string;
   member_id: string;
+  entry_date: string; // YYYY-MM-DD
   amount: string;
   note: string | null;
   added_by: string;
@@ -76,5 +78,6 @@ export interface SheetData {
 
 export interface MonthCreatePayload {
   rate_type: RateType; // sheet-level
-  phases: Omit<MealPhase, "id">[];
+  phases: MealPhase[];
+  phase_transfer_map?: Record<string, string | null>;
 }

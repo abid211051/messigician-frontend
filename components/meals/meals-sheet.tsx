@@ -28,7 +28,7 @@ export default function MealSheet({
   onCellChange,
 }: Props) {
   const { month, members, entries, shopping } = data;
-  const { phases, status, rate_type } = month; // rate_type is sheet-level
+  const { phases, status, rate_type } = month;
   const now = new Date();
   const isThisMonth =
     now.getFullYear() === month.year && now.getMonth() + 1 === month.month;
@@ -36,8 +36,11 @@ export default function MealSheet({
   const daysInMonth = new Date(month.year, month.month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const isClosed = status === "closed";
+  const monthShort = new Date(month.year, month.month - 1, 1).toLocaleString(
+    "default",
+    { month: "short" },
+  );
 
-  // Per-phase edit-window open/closed — computed once per render
   const phaseWindowMap = useMemo(() => {
     const t = currentHHMM();
     return Object.fromEntries(
@@ -48,7 +51,6 @@ export default function MealSheet({
     );
   }, [phases, isClosed]);
 
-  // "memberId-day-phaseId" → count
   const entryMap = useMemo(() => {
     const m: Record<string, number> = {};
     for (const e of entries)
@@ -57,7 +59,6 @@ export default function MealSheet({
     return m;
   }, [entries]);
 
-  // Total meals per member across all days (for totals row)
   const memberTotals = useMemo(() => {
     const t: Record<string, number> = {};
     for (const e of entries)
@@ -67,9 +68,8 @@ export default function MealSheet({
     return t;
   }, [entries]);
 
-  // Total meals per member per phase (for totals row in fixed layout)
   const phaseTotals = useMemo(() => {
-    const t: Record<string, number> = {}; // "memberId-phaseId"
+    const t: Record<string, number> = {};
     for (const e of entries)
       for (const [pId, cnt] of Object.entries(e.counts)) {
         const k = `${e.member_id}-${pId}`;
@@ -87,17 +87,20 @@ export default function MealSheet({
 
   const STICKY = "sticky left-0 z-10";
   const HDR = "text-[10px] font-semibold text-gray-500 uppercase tracking-wide";
-  const CELL_W = "min-w-[52px]";
-  const TODAY_BG = "bg-blue-50/40";
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white mb-3">
-      <table className="border-collapse text-xs w-full">
+      {/*
+        w-full: fills the container on large screens (no blank space to the right)
+        No fixed cell widths: only min-w on headers so cells expand naturally on desktop
+        min-w on header cells: ensures minimum size on narrow mobile screens
+      */}
+      <table className="w-full border-collapse text-xs">
         <thead>
-          {/* Row 1: Day | Member names (colSpan = phases.length) | Shop */}
-          <tr className="border-b border-gray-100 bg-gray-50/60">
+          {/* Row 1: Day | Member names | Shop */}
+          <tr className="border-b border-gray-100 bg-gray-50">
             <th
-              className={`${STICKY} bg-gray-50/60 px-2 py-2.5 text-left ${HDR} border-r border-gray-100 min-w-[44px]`}
+              className={`${STICKY} bg-gray-50 px-3 py-3 text-left ${HDR} border-r border-gray-100 min-w-[80px]`}
             >
               Day
             </th>
@@ -105,45 +108,46 @@ export default function MealSheet({
               <th
                 key={m.id}
                 colSpan={phases.length}
-                className={`px-1.5 py-2 text-center ${HDR} border-r border-gray-100 last:border-r-0`}
+                className={`px-2 py-2.5 text-center ${HDR} border-r border-gray-100 last:border-r-0 min-w-[${phases.length * 72}px]`}
               >
-                <span className="truncate block mx-auto" title={m.name}>
+                <span className="block" title={m.name}>
                   {m.name.split(" ")[0]}
                 </span>
               </th>
             ))}
-            <th className={`${CELL_W} px-1.5 py-2.5 text-center ${HDR}`}>
+            <th className={`px-2 py-2.5 text-center ${HDR} min-w-[90px]`}>
               Shop (৳)
             </th>
           </tr>
 
-          {/* Row 2: Phase names + rate indicator (rate shown only in fixed mode) */}
-          <tr className="border-b border-gray-100 bg-gray-50/30">
+          {/* Row 2: Phase subheaders */}
+          <tr className="border-b border-gray-100 bg-gray-50">
             <th
-              className={`${STICKY} bg-gray-50/30 px-2 py-1 border-r border-gray-100`}
+              className={`${STICKY} bg-gray-50 px-3 py-1.5 border-r border-gray-100 min-w-[80px]`}
             />
             {members.flatMap((m) =>
               phases.map((p, pi) => (
                 <th
                   key={`${m.id}-${p.id}`}
-                  className={`${CELL_W} px-1 py-1 text-center text-[9px] font-medium text-gray-400 ${
+                  className={`px-2 py-1.5 text-center text-[10px] font-medium text-gray-400 min-w-[72px] ${
                     pi === phases.length - 1 ? "border-r border-gray-100" : ""
                   }`}
                   title={
                     rate_type === "fixed"
-                      ? `${p.name} · ৳${p.rate}/meal (fixed)`
-                      : `${p.name} (dynamic)`
+                      ? `${p.name} · ৳${p.rate}/meal`
+                      : p.name
                   }
                 >
-                  {p.name.slice(0, 3)}
-                  {/* Rate indicator only meaningful in fixed mode */}
+                  {p.name.length > 7 ? p.name.slice(0, 6) + "…" : p.name}
                   {rate_type === "fixed" && (
-                    <span className="ml-0.5 text-gray-300">·{p.rate}</span>
+                    <span className="block text-[9px] text-gray-300 font-normal">
+                      ৳{p.rate}
+                    </span>
                   )}
                 </th>
               )),
             )}
-            <th />
+            <th className="min-w-[90px]" />
           </tr>
         </thead>
 
@@ -153,23 +157,26 @@ export default function MealSheet({
             return (
               <tr
                 key={day}
-                className={`border-b border-gray-50 last:border-b-0 ${isToday ? TODAY_BG : ""}`}
+                className={`border-b border-gray-50 last:border-b-0 ${isToday ? "bg-blue-50/40" : ""}`}
               >
-                {/* Day label */}
+                {/* Solid bg on sticky cell to block scroll bleed-through */}
                 <td
-                  className={`${STICKY} px-2 py-0.5 border-r border-gray-100 font-medium whitespace-nowrap text-gray-600 ${
-                    isToday ? `${TODAY_BG} text-blue-600` : "bg-white"
+                  className={`${STICKY} px-3 py-1 border-r border-gray-100 whitespace-nowrap min-w-[80px] ${
+                    isToday
+                      ? "bg-blue-50 text-blue-600"
+                      : "bg-white text-gray-600"
                   }`}
                 >
-                  {day}
+                  <span className="font-medium text-xs">
+                    {day} {monthShort}
+                  </span>
                   {isToday && (
-                    <span className="ml-1 text-[8px] text-blue-400 font-semibold align-middle">
+                    <span className="block text-[8px] text-blue-400 font-semibold leading-none mt-0.5">
                       today
                     </span>
                   )}
                 </td>
 
-                {/* One cell per phase per member */}
                 {members.flatMap((m) =>
                   phases.map((p, pi) => {
                     const value = entryMap[`${m.id}-${day}-${p.id}`] ?? 0;
@@ -178,12 +185,10 @@ export default function MealSheet({
                       (m.id === currentUserId &&
                         isToday &&
                         phaseWindowMap[p.id]);
-                    const isLastPhase = pi === phases.length - 1;
-
                     return (
                       <td
                         key={`${m.id}-${p.id}`}
-                        className={`p-0 ${isLastPhase ? "border-r border-gray-100" : ""} ${isToday ? TODAY_BG : ""}`}
+                        className={`p-0 min-w-[72px] ${pi === phases.length - 1 ? "border-r border-gray-100" : ""} ${isToday ? "bg-blue-50/40" : ""}`}
                       >
                         <MealCell
                           monthId={month.id}
@@ -200,9 +205,8 @@ export default function MealSheet({
                   }),
                 )}
 
-                {/* Shopping total for the day */}
                 <td
-                  className={`px-1.5 py-1.5 text-center text-gray-600 tabular-nums ${isToday ? TODAY_BG : ""}`}
+                  className={`px-2 py-1.5 text-center text-gray-600 tabular-nums text-xs min-w-[90px] ${isToday ? "bg-blue-50/40" : ""}`}
                 >
                   {shoppingByDay[day] ? (
                     shoppingByDay[day].toLocaleString()
@@ -214,29 +218,26 @@ export default function MealSheet({
             );
           })}
 
-          {/* Totals row */}
+          {/* Totals */}
           <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
             <td
-              className={`${STICKY} bg-gray-50 px-2 py-1.5 text-gray-700 border-r border-gray-200 text-xs`}
+              className={`${STICKY} bg-gray-50 px-3 py-2 text-gray-700 border-r border-gray-200 text-xs min-w-[80px]`}
             >
               Total
             </td>
             {members.flatMap((m) =>
-              phases.map((p, pi) => {
-                const isLastPhase = pi === phases.length - 1;
-                return (
-                  <td
-                    key={`${m.id}-${p.id}`}
-                    className={`text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs ${
-                      isLastPhase ? "border-r border-gray-100" : ""
-                    }`}
-                  >
-                    {phaseTotals[`${m.id}-${p.id}`] ?? 0}
-                  </td>
-                );
-              }),
+              phases.map((p, pi) => (
+                <td
+                  key={`${m.id}-${p.id}`}
+                  className={`text-center px-2 py-2 text-gray-800 tabular-nums text-xs min-w-[72px] ${
+                    pi === phases.length - 1 ? "border-r border-gray-100" : ""
+                  }`}
+                >
+                  {phaseTotals[`${m.id}-${p.id}`] ?? 0}
+                </td>
+              )),
             )}
-            <td className="text-center px-1.5 py-1.5 text-gray-800 tabular-nums text-xs">
+            <td className="text-center px-2 py-2 text-gray-800 tabular-nums text-xs min-w-[90px]">
               {Object.values(shoppingByDay)
                 .reduce((a, b) => a + b, 0)
                 .toLocaleString()}

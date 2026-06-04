@@ -20,6 +20,7 @@ import {
 } from "./actions";
 import { handleApiError } from "@/lib/helpers/errors";
 import { EditTenantFormValues } from "./validation";
+import { DELETE_BTN_STYLE } from "@/lib/constants";
 
 const PAGE_SIZE = 10;
 const PARAM_PAGE = "page";
@@ -303,10 +304,10 @@ export default function TenantsClient() {
 
             {selectedIds.size > 0 && (
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 onClick={handleBulkDeleteClick}
-                className="h-7 text-xs px-3 gap-1.5"
+                className={DELETE_BTN_STYLE}
               >
                 <Trash2 className="w-3 h-3" />
                 Delete ({selectedIds.size})

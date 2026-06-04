@@ -37,6 +37,7 @@ import PageSkeleton from "@/components/reusable/loading-skeleton";
 import CreateSubMessDialog from "./sub-mess-create-dialog";
 import {
   DEFAULT_PAGE_SIZE,
+  DELETE_BTN_STYLE,
   PARAM_LIMIT,
   PARAM_PAGE,
   PARAM_SEARCH,
@@ -390,10 +391,10 @@ export default function SubMessClient() {
 
             {selectedIds.size > 0 && (
               <Button
-                variant="destructive"
+                variant={"outline"}
                 size="sm"
                 onClick={handleBulkDeleteClick}
-                className="h-7 text-xs px-3 gap-1.5"
+                className={DELETE_BTN_STYLE}
               >
                 <Trash2 className="w-3 h-3" />
                 Delete ({selectedIds.size})

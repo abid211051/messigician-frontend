@@ -68,6 +68,7 @@ const DEFAULT_SHOPPING: ShoppingEntry[] = [
   {
     id: "sh-1",
     day_number: 1,
+    entry_date: toISODate(new Date()),
     amount: "850",
     note: "Vegetables & rice",
     added_by: MEMBER_1,
@@ -76,6 +77,7 @@ const DEFAULT_SHOPPING: ShoppingEntry[] = [
   {
     id: "sh-2",
     day_number: 2,
+    entry_date: toISODate(new Date()),
     amount: "620",
     note: "Chicken",
     added_by: MEMBER_1,
@@ -84,6 +86,7 @@ const DEFAULT_SHOPPING: ShoppingEntry[] = [
   {
     id: "sh-3",
     day_number: 3,
+    entry_date: toISODate(new Date()),
     amount: "390",
     note: null,
     added_by: MEMBER_1,
@@ -112,6 +115,19 @@ function monthId(year: number, month: number) {
 function monthDiff(year: number, month: number) {
   const now = new Date();
   return (year - now.getFullYear()) * 12 + (month - (now.getMonth() + 1));
+}
+
+function toISODate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function dayNumberFromDate(value: string) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getDate();
 }
 
 function getStoredMonthById(id: string): StoredMonth | null {
@@ -310,15 +326,31 @@ export async function updateMonthPhases(
   await delay(250);
   const stored = getStoredMonthById(monthId);
   if (!stored) throw new Error("Month not found.");
+  if (payload.phases.length === 0) {
+    throw new Error("A sheet must keep at least one phase.");
+  }
 
-  const oldPhases = stored.month.phases;
+  const nextPhaseIds = new Set(payload.phases.map((phase) => phase.id));
+  const transferMap = payload.phase_transfer_map ?? {};
 
-  // Preserve IDs for phases with the same name so existing entries survive
+  for (const entry of stored.entries) {
+    const nextCounts: Record<string, number> = {};
+    for (const [phaseId, count] of Object.entries(entry.counts)) {
+      if (nextPhaseIds.has(phaseId)) {
+        nextCounts[phaseId] = (nextCounts[phaseId] ?? 0) + count;
+        continue;
+      }
+
+      const transferTo = transferMap[phaseId];
+      if (transferTo && nextPhaseIds.has(transferTo)) {
+        nextCounts[transferTo] = (nextCounts[transferTo] ?? 0) + count;
+      }
+    }
+    entry.counts = nextCounts;
+  }
+
   stored.month.rate_type = payload.rate_type;
-  stored.month.phases = payload.phases.map((p, i) => {
-    const existing = oldPhases.find((op) => op.name === p.name);
-    return { ...p, id: existing?.id ?? `ph-${Date.now()}-${i}` };
-  });
+  stored.month.phases = payload.phases.map((phase) => ({ ...phase }));
 
   _lastSettings = payload;
   return snapshot(stored);
@@ -367,7 +399,7 @@ export async function upsertMealEntry(body: {
 
 export async function addShoppingEntry(body: {
   meal_month_id: string;
-  day_number: number;
+  entry_date: string;
   amount: number;
   note?: string;
 }) {
@@ -375,9 +407,13 @@ export async function addShoppingEntry(body: {
   const stored = getStoredMonthById(body.meal_month_id);
   if (!stored) throw new Error("Month not found.");
 
+  const day_number = dayNumberFromDate(body.entry_date);
+  if (!day_number || day_number < 1) throw new Error("Invalid shopping date.");
+
   const entry: ShoppingEntry = {
     id: `sh-${Date.now()}`,
-    day_number: body.day_number,
+    day_number,
+    entry_date: body.entry_date,
     amount: String(body.amount),
     note: body.note ?? null,
     added_by: MEMBER_1,
@@ -390,7 +426,7 @@ export async function addShoppingEntry(body: {
 export async function updateShoppingEntry(body: {
   id: string;
   meal_month_id: string;
-  day_number: number;
+  entry_date: string;
   amount: number;
   note?: string;
 }) {
@@ -398,11 +434,15 @@ export async function updateShoppingEntry(body: {
   const stored = getStoredMonthById(body.meal_month_id);
   if (!stored) throw new Error("Month not found.");
 
+  const day_number = dayNumberFromDate(body.entry_date);
+  if (!day_number || day_number < 1) throw new Error("Invalid shopping date.");
+
   const idx = stored.shopping.findIndex((s) => s.id === body.id);
   if (idx === -1) throw new Error("Shopping entry not found.");
   stored.shopping[idx] = {
     ...stored.shopping[idx],
-    day_number: body.day_number,
+    day_number,
+    entry_date: body.entry_date,
     amount: String(body.amount),
     note: body.note ?? null,
   };
@@ -422,6 +462,7 @@ export async function deleteShoppingEntry(id: string) {
 export async function addDepositEntry(body: {
   meal_month_id: string;
   member_id: string;
+  entry_date: string;
   amount: number;
   note?: string;
 }) {
@@ -432,6 +473,7 @@ export async function addDepositEntry(body: {
   const entry: DepositEntry = {
     id: `dep-${Date.now()}`,
     member_id: body.member_id,
+    entry_date: body.entry_date,
     amount: String(body.amount),
     note: body.note ?? null,
     added_by: MEMBER_1,
@@ -445,6 +487,7 @@ export async function updateDepositEntry(body: {
   id: string;
   meal_month_id: string;
   member_id: string;
+  entry_date: string;
   amount: number;
   note?: string;
 }) {
@@ -457,6 +500,7 @@ export async function updateDepositEntry(body: {
   stored.deposits[idx] = {
     ...stored.deposits[idx],
     member_id: body.member_id,
+    entry_date: body.entry_date,
     amount: String(body.amount),
     note: body.note ?? null,
   };

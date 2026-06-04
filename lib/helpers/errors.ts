@@ -7,6 +7,9 @@ export interface ErrorArray {
 }
 
 const toastDisplay = (errMsg: string) => {
+  // sonner relies on the DOM — bail out silently when called server-side
+  // (e.g. from a Server Component layout that catches an async error)
+  if (typeof window === "undefined") return;
   toast.error(errMsg, { richColors: true, position: "top-center" });
 };
 
