@@ -153,16 +153,13 @@ export default function StartMonthDialog({
     });
   };
 
-  // Uniform padding: p-5 on all sections for consistent visual weight
-  const SECTION_P = "px-5";
-
   return (
     <>
       <AlertDialog open={open} onOpenChange={onOpenChange}>
-        <AlertDialogContent className="sm:max-w-md w-[min(calc(100vw-1.5rem),448px)] rounded-2xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <AlertDialogContent className="w-[calc(100%-1rem)] max-w-md rounded-2xl max-h-[90vh] flex flex-col gap-0 overflow-hidden">
           {/* Header */}
           <AlertDialogHeader
-            className={`${SECTION_P} pt-5 pb-4 border-b border-gray-100 bg-white shrink-0`}
+            className={`py-3 border-b border-gray-100 bg-white shrink-0`}
           >
             <AlertDialogTitle className="text-base font-bold">
               {isCreate
@@ -178,7 +175,7 @@ export default function StartMonthDialog({
 
           {/* Scrollable body — same px-5 as header/footer */}
           <div
-            className={`flex-1 overflow-y-auto bg-white ${SECTION_P} py-5 flex flex-col gap-5`}
+            className={`flex-1 overflow-y-auto bg-white py-5 flex flex-col gap-5`}
           >
             {isCreate && previousSettings && (
               <button
@@ -236,7 +233,7 @@ export default function StartMonthDialog({
 
             {/* Phases */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between gap-2 mb-3">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
                   Meal Phases
                   {phases.length === 0 && (
@@ -249,7 +246,8 @@ export default function StartMonthDialog({
                   onClick={addPhase}
                   className="flex items-center gap-1 text-xs text-brand-primary font-medium hover:underline"
                 >
-                  <Plus className="w-3 h-3" /> Add phase
+                  <Plus className="w-3 h-3" />
+                  <span>Add phase</span>
                 </button>
               </div>
 
@@ -266,7 +264,7 @@ export default function StartMonthDialog({
                 {phases.map((phase) => (
                   <div
                     key={phase.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 flex flex-col gap-3"
+                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-3 flex flex-col gap-3"
                   >
                     {/* Name + delete */}
                     <div className="flex items-center gap-2">
@@ -354,7 +352,7 @@ export default function StartMonthDialog({
 
           {/* Footer — same px-5 as header/body, solid white */}
           <AlertDialogFooter
-            className={`${SECTION_P} pb-5 pt-4 border-t border-gray-100 bg-white rounded-b-2xl flex flex-row gap-2.5 shrink-0`}
+            className={`border-t border-gray-100 bg-white rounded-b-2xl flex flex-row gap-2.5 shrink-0`}
           >
             <Button
               variant="outline"
@@ -378,9 +376,9 @@ export default function StartMonthDialog({
 
       {/* Phase delete dialog — X is the only cancel, no redundant button */}
       <AlertDialog open={deletePromptOpen} onOpenChange={cancelPhaseDelete}>
-        <AlertDialogContent className="sm:max-w-sm w-[min(calc(100vw-1.5rem),400px)] rounded-2xl p-0 gap-0 overflow-hidden">
-          <AlertDialogHeader className="px-5 pt-5 pb-4 border-b border-gray-100 bg-white">
-            <div className="flex items-center justify-between gap-3">
+        <AlertDialogContent className="w-[calc(100%-1rem)] max-w-md rounded-2xl flex flex-col gap-0 overflow-hidden">
+          <AlertDialogHeader className="border-b border-gray-100 bg-white">
+            <div className="w-full flex items-center justify-between gap-3">
               <AlertDialogTitle className="text-base font-bold">
                 Delete phase?
               </AlertDialogTitle>
@@ -393,7 +391,7 @@ export default function StartMonthDialog({
             </div>
           </AlertDialogHeader>
 
-          <div className="px-5 py-5 bg-white flex flex-col gap-4">
+          <div className="bg-white flex flex-col gap-4 py-3">
             <p className="text-sm text-gray-600 leading-relaxed">
               Transfer this phase&apos;s meal entries to another phase, or
               delete them permanently.
@@ -402,10 +400,10 @@ export default function StartMonthDialog({
               value={transferTargetId}
               onValueChange={setTransferTargetId}
             >
-              <SelectTrigger className="h-11 rounded-xl text-sm bg-gray-50">
+              <SelectTrigger className="min-w-[120px] h-11 rounded-xl text-sm bg-gray-50">
                 <SelectValue placeholder="Select transfer target" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" align="start">
                 {phases
                   .filter((p) => p.id !== pendingDeletePhaseId)
                   .map((p) => (
@@ -417,7 +415,7 @@ export default function StartMonthDialog({
             </Select>
           </div>
 
-          <AlertDialogFooter className="px-5 pb-5 pt-4 border-t border-gray-100 bg-white rounded-b-2xl flex flex-row gap-2.5">
+          <AlertDialogFooter className="border-t border-gray-100 bg-white rounded-b-2xl flex flex-row gap-2.5">
             <Button
               variant="outline"
               onClick={() => applyPhaseDelete(true)}

@@ -100,7 +100,7 @@ export default function MealSheet({
           {/* Row 1: Day | Member names | Shop */}
           <tr className="border-b border-gray-100 bg-gray-50">
             <th
-              className={`${STICKY} bg-gray-50 px-3 py-3 text-left ${HDR} border-r border-gray-100 min-w-[80px]`}
+              className={`${STICKY} bg-gray-50 px-2 py-3 text-left ${HDR} border-r border-gray-100 min-w-[64px]`}
             >
               Day
             </th>
@@ -123,7 +123,7 @@ export default function MealSheet({
           {/* Row 2: Phase subheaders */}
           <tr className="border-b border-gray-100 bg-gray-50">
             <th
-              className={`${STICKY} bg-gray-50 px-3 py-1.5 border-r border-gray-100 min-w-[80px]`}
+              className={`${STICKY} bg-gray-50 px-2 py-1.5 border-r border-gray-100 min-w-[64px]`}
             />
             {members.flatMap((m) =>
               phases.map((p, pi) => (
@@ -161,7 +161,7 @@ export default function MealSheet({
               >
                 {/* Solid bg on sticky cell to block scroll bleed-through */}
                 <td
-                  className={`${STICKY} px-3 py-1 border-r border-gray-100 whitespace-nowrap min-w-[80px] ${
+                  className={`${STICKY} px-2 py-1 border-r border-gray-100 whitespace-nowrap min-w-[64px] ${
                     isToday
                       ? "bg-blue-50 text-blue-600"
                       : "bg-white text-gray-600"
@@ -221,7 +221,7 @@ export default function MealSheet({
           {/* Totals */}
           <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
             <td
-              className={`${STICKY} bg-gray-50 px-3 py-2 text-gray-700 border-r border-gray-200 text-xs min-w-[80px]`}
+              className={`${STICKY} bg-gray-50 px-2 py-2 text-gray-700 border-r border-gray-200 text-xs min-w-[64px]`}
             >
               Total
             </td>

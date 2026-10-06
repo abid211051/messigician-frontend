@@ -347,6 +347,7 @@ export default function MealsClient({ subMessId, isOwner }: Props) {
       )}
 
       {/* Sheet dialog */}
+
       <StartMonthDialog
         key={`${sheetDialogMode}-${year}-${month}-${sheetDialogOpen}`}
         open={sheetDialogOpen}

@@ -26,7 +26,7 @@ import { useRouter } from "next/navigation";
 import {
   searchSubMessListApi,
   joinRequestApi,
-} from "@/app/onboard/join/action";
+} from "@/app/onboard/join/actions";
 import { handleApiError } from "@/lib/helpers/errors";
 
 const MessJoinForm = () => {

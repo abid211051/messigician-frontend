@@ -21,7 +21,7 @@ import {
   createMessSchema,
   type CreateMessFormValues,
 } from "@/app/onboard/create/validation";
-import { messCreationApi } from "@/app/onboard/create/action";
+import { messCreationApi } from "@/app/onboard/create/actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { handleApiError } from "@/lib/helpers/errors";

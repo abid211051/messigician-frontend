@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { PT_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import LocatorPrivider from "@/hooks/locatorjs";
 
 const PtSans = PT_Sans({
   variable: "--font-PT_Sans",
@@ -22,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={PtSans.variable}>
       <body className="antialiased bg-slate-200">
+        <LocatorPrivider />
         <Toaster />
         {children}
       </body>

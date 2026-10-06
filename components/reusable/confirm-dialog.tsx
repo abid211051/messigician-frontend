@@ -41,17 +41,19 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="sm:w-90 w-70 rounded-2xl">
+      <AlertDialogContent className="w-[calc(100%-1rem)] max-w-md rounded-2xl flex flex-col gap-2 overflow-hidden">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-base">{title}</AlertDialogTitle>
-          <AlertDialogDescription className="text-sm">
+          <AlertDialogTitle className="text-base font-bold">
+            {title}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="py-3 text-sm">
             {!children ? description : null}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {children && <div className="py-1">{children}</div>}
+        {children && <div className="py-3">{children}</div>}
 
-        <AlertDialogFooter className="flex-row gap-2 sm:flex-row">
+        <AlertDialogFooter className="flex-row gap-4">
           <AlertDialogCancel
             disabled={isLoading}
             className="flex-1 h-10 text-sm rounded-xl mt-0"
