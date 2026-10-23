@@ -1,6 +1,6 @@
-import MessCreationForm from "@/app/onboard/create/messCreateForm";
 import { SYSTEM_WIDE_PADDING } from "@/lib/constants";
 import MessigicianLogo from "@/components/svg/messigicianLogo";
+import MessCreationForm from "./messCreateForm";
 
 export default function MessCreationPage() {
   return (

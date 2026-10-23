@@ -1,45 +1,76 @@
 import axios from "axios";
 import { toast } from "sonner";
 
-export interface ErrorArray {
-  message?: string;
+interface ErrorDetail {
   field?: string;
+  message?: string;
 }
 
-const toastDisplay = (errMsg: string) => {
-  // sonner relies on the DOM — bail out silently when called server-side
-  // (e.g. from a Server Component layout that catches an async error)
-  if (typeof window === "undefined") return;
-  toast.error(errMsg, { richColors: true, position: "top-center" });
+interface ApiErrorResponse {
+  message?: string | string[];
+  error?: {
+    message?: string | string[];
+    details?: ErrorDetail[];
+  };
+  errors?: ErrorDetail[];
+}
+
+const toastDisplay = (message: string) => {
+  if (typeof window === "undefined" || !message.trim()) return;
+
+  toast.error(message, {
+    richColors: true,
+    position: "top-center",
+  });
 };
 
-export function handleApiError(error: unknown) {
-  let errMsg = "";
-  if (axios.isAxiosError(error)) {
-    if (error.response) {
-      const { data } = error.response;
-      if (data?.errors) {
-        errMsg = data.errors?.map((e: any) => e.message).join("\n");
-      } else if (data?.message) {
-        errMsg = data.message;
-      }
-      toastDisplay(errMsg);
-      return errMsg;
-    }
-    if (error.request) {
-      if (error.code === "ECONNABORTED") {
-        errMsg = "Request timeout. Please try again.";
-      } else if (error.code === "ERR_NETWORK") {
-        errMsg = "Network error. Server is unreachable.";
-      } else {
-        errMsg = "No response received from the server.";
-      }
-      toastDisplay(errMsg);
-      return errMsg;
-    }
-  } else {
-    errMsg = "An unexpected error occurred";
-    toastDisplay(errMsg);
-    return errMsg;
+function getErrorMessage(data: ApiErrorResponse | null | undefined): string {
+  if (!data) return "An unexpected error occurred";
+
+  const details = data.error?.details ?? data.errors;
+
+  if (Array.isArray(details) && details.length > 0) {
+    return details
+      .map((item) =>
+        item.field
+          ? `${item.field}: ${item.message ?? "Invalid value"}`
+          : (item.message ?? "Invalid value"),
+      )
+      .join("\n");
   }
+
+  const message = data.error?.message ?? data.message;
+
+  if (Array.isArray(message)) {
+    return message.join("\n");
+  }
+
+  if (typeof message === "string" && message.trim()) {
+    return message;
+  }
+
+  return "An unexpected error occurred";
+}
+
+export function handleApiError(error: unknown): string {
+  let message = "An unexpected error occurred";
+
+  if (axios.isAxiosError<ApiErrorResponse>(error)) {
+    if (error.response) {
+      message = getErrorMessage(error.response.data);
+    } else if (error.code === "ECONNABORTED") {
+      message = "Request timeout. Please try again.";
+    } else if (error.code === "ERR_NETWORK") {
+      message = "Network error. Server is unreachable.";
+    } else if (error.request) {
+      message = "No response received from the server.";
+    } else if (error.message) {
+      message = error.message;
+    }
+  } else if (error instanceof Error && error.message) {
+    message = error.message;
+  }
+
+  toastDisplay(message);
+  return message;
 }

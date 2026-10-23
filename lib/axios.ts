@@ -17,7 +17,6 @@ api.interceptors.request.use(
           config.headers.Cookie = cookieString;
         }
       } catch (error) {
-        // Safe fallback if called outside of a Next.js request lifecycle
         console.warn(
           "Axios request interceptor could not read server cookies:",
           error,

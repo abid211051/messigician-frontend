@@ -9,5 +9,5 @@ export type AuthUser = {
 export type AuthStore = {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
-  clearUser: () => void;
+  clearAuth: () => void;
 };
