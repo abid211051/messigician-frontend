@@ -3,6 +3,12 @@ import { FetchSubMessesParams } from "./types";
 
 const DEFAULT_PAGE_SIZE = 10;
 
+export interface CreateSubMessBody {
+  fname: string;
+  total_rent?: number;
+  no_of_seats?: number;
+}
+
 export async function fetchSubMesses({
   mess_id,
   page,
@@ -19,9 +25,10 @@ export async function fetchSubMesses({
   if (sortOrder && sortOrder !== "desc") params.set("sortOrder", sortOrder);
 
   const qs = params.toString();
-  const url = `/sub-mess/all/${mess_id}${qs ? `?${qs}` : ""}`;
+  const url = `/sub-mess/all${qs ? `?${qs}` : ""}`;
   const res = await api.get(url);
-  return res.data;
+
+  return res.data.data;
 }
 
 export async function fetchSingleSubMess(id: string) {
@@ -29,14 +36,8 @@ export async function fetchSingleSubMess(id: string) {
   return res.data.data;
 }
 
-export interface CreateSubMessBody {
-  fname: string;
-  total_rent?: number;
-  no_of_seats?: number;
-}
-
 export async function createSubMess(mess_id: string, body: CreateSubMessBody) {
-  const res = await api.post(`/sub-mess/${mess_id}`, body);
+  const res = await api.post(`/sub-mess`, body);
   return res.data;
 }
 

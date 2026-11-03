@@ -1,17 +1,38 @@
 import api from "@/lib/axios";
-import { AcceptData } from "./types";
+import type { AcceptData, RequestData } from "./types";
+import { ApiSuccessResponse, MessageResponse } from "@/lib/types/apiResType";
 
-export const getAllJoinRequests = async (mess_id: string) => {
-  const res = await api.get(`/join-request/${mess_id}`);
-  return res;
-};
+type AcceptPayload = Pick<AcceptData, "request_id" | "sub_mess_id">;
 
-export const acceptJoinRequest = async (payload: AcceptData) => {
-  const res = await api.post(`/join-request/accept`, payload);
-  return res;
-};
+export async function getAllJoinRequests(): Promise<RequestData[]> {
+  const res = await api.get<ApiSuccessResponse<RequestData[]>>("/join-request");
 
-export const rejectJoinRequest = async (request_id: string) => {
-  const res = await api.delete(`/join-request/reject/${request_id}`);
-  return res;
-};
+  const data = res.data.data;
+
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid join requests response");
+  }
+
+  return data;
+}
+
+export async function acceptJoinRequest(
+  payload: AcceptPayload,
+): Promise<MessageResponse> {
+  const res = await api.post<ApiSuccessResponse<MessageResponse>>(
+    "/join-request/accept",
+    payload,
+  );
+
+  return res.data.data;
+}
+
+export async function rejectJoinRequest(
+  requestId: string,
+): Promise<MessageResponse> {
+  const res = await api.delete<ApiSuccessResponse<MessageResponse>>(
+    `/join-request/reject/${requestId}`,
+  );
+
+  return res.data.data;
+}

@@ -6,7 +6,7 @@ import { CUDResponse } from "@/lib/types/global";
 export async function fetchSubMesses(
   mess_id: string,
 ): Promise<SubMessOption[]> {
-  const res = await api.get(`/tenants/sub-mess/all/${mess_id}`);
+  const res = await api.get(`/tenants/sub-mess/all`);
   return res.data?.data ?? [];
 }
 
@@ -19,9 +19,9 @@ export async function fetchTenants({
     sub_mess_ids.size > 0 ? Array.from(sub_mess_ids).join(",") : "";
 
   const res = await api.get(
-    `/tenants/${mess_id}?page=${page}&sub_mess_ids=${processedSubMessIds}`,
+    `/tenants?page=${page}&sub_mess_ids=${processedSubMessIds}`,
   );
-  return res.data;
+  return res.data?.data ?? [];
 }
 
 export async function deleteTenants(tenantIds: Set<string>): Promise<void> {
