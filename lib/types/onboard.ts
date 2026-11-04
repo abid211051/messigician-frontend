@@ -5,6 +5,6 @@ export interface Submess {
 
 export interface MessSearchResult {
   id: string;
-  fname: string;
+  name: string;
   mess_id: string;
 }

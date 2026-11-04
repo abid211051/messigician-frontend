@@ -105,7 +105,7 @@ export default function TenantCard({
             <div className="flex items-center gap-1 text-brand-primary">
               {/* <Banknote className="w-3.5 h-3.5" /> */}
               <span
-                className={`flex font-bold ${tenant?.total_due > 0 ? "text-brand-secondary" : "text-danger"} text-sm`}
+                className={`flex ${tenant?.total_due > 0 ? "text-brand-secondary" : "text-danger"} text-xs`}
               >
                 {fmt(tenant?.total_due)}
               </span>

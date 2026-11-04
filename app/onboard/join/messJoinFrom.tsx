@@ -230,7 +230,7 @@ const MessJoinForm = () => {
                   >
                     <div className="flex items-center gap-2">
                       <div className="size-2 rounded-full bg-brand-secondary shrink-0" />
-                      <span className="font-medium">{sub.fname}</span>
+                      <span className="font-medium">{sub.name}</span>
                     </div>
                   </SelectItem>
                 ))}
