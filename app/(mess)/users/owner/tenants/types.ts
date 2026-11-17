@@ -21,10 +21,14 @@ export interface TenantData {
 export interface SubMessOption {
   id: string;
   sub_mess_name: string;
+  no_of_seats: number;
+  no_of_members: number;
+  available_seats: number;
+  is_full: boolean;
 }
 export interface FetchParams {
-  mess_id: string | undefined;
   page: number;
+  limit?: number;
   sub_mess_ids: Set<string>;
 }
 

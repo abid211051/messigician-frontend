@@ -1,26 +1,22 @@
 import api from "@/lib/axios";
-import { FetchParams, FetchResult, SubMessOption } from "./types";
+import { FetchParams, FetchResult } from "./types";
 import { EditTenantFormValues } from "./validation";
 import { CUDResponse } from "@/lib/types/global";
-
-export async function fetchSubMesses(
-  mess_id: string,
-): Promise<SubMessOption[]> {
-  const res = await api.get(`/tenants/sub-mess/all`);
-  return res.data?.data ?? [];
-}
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
+import { buildListQuery } from "@/lib/helpers/list-query";
 
 export async function fetchTenants({
-  mess_id,
   page,
+  limit,
   sub_mess_ids,
 }: FetchParams): Promise<FetchResult> {
-  const processedSubMessIds =
-    sub_mess_ids.size > 0 ? Array.from(sub_mess_ids).join(",") : "";
-
-  const res = await api.get(
-    `/tenants?page=${page}&sub_mess_ids=${processedSubMessIds}`,
-  );
+  const query = buildListQuery({
+    page,
+    limit: limit ?? DEFAULT_PAGE_SIZE,
+    sub_mess_ids:
+      sub_mess_ids.size > 0 ? Array.from(sub_mess_ids).join(",") : undefined,
+  });
+  const res = await api.get(`/tenants?${query}`);
   return res.data?.data ?? [];
 }
 

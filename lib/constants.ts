@@ -1,5 +1,6 @@
 export const SYSTEM_WIDE_PADDING = "p-3";
 export const DEFAULT_PAGE_SIZE = 10;
+export const MAX_PAGE_SIZE = 20;
 export const PARAM_PAGE = "page";
 export const PARAM_LIMIT = "limit";
 export const PARAM_SEARCH = "search";

@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { handleApiError } from "@/lib/helpers/errors";
-import { fetchSubMesses } from "./tenants/actions";
+import { fetchAllSubMesses } from "./subMess/actions";
 import type { SubMessOption } from "./tenants/types";
 
 export default function SubMessSelector() {
@@ -29,7 +29,7 @@ export default function SubMessSelector() {
     if (!mess_id) return;
     startLoading(async () => {
       try {
-        setSubMesses((await fetchSubMesses(mess_id)) ?? []);
+        setSubMesses((await fetchAllSubMesses()) ?? []);
       } catch (err) {
         handleApiError(err);
       } finally {
@@ -81,8 +81,20 @@ export default function SubMessSelector() {
               onClick={() => handleSelect(sm.id)}
               className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 cursor-pointer"
             >
+              <span
+                className={`size-2 rounded-full ${
+                  sm.is_full ? "bg-red-400" : "bg-brand-secondary"
+                }`}
+              />
               <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
               <span className="truncate">{sm.sub_mess_name}</span>
+              <span className="ml-auto text-xs text-gray-500">
+                {sm.is_full
+                  ? "Full"
+                  : `${sm.available_seats} ${
+                      sm.available_seats === 1 ? "seat" : "seats"
+                    } left`}
+              </span>
             </DropdownMenuItem>
           ))}
         </div>

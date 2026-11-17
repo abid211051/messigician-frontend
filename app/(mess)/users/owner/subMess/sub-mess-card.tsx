@@ -42,7 +42,7 @@ export default function SubMessCard({
       ? Math.min(
           100,
           Math.round(
-            (Number(subMess.no_of_members) / subMess.no_of_seats) * 100,
+            (subMess.no_of_members / subMess.no_of_seats) * 100,
           ),
         )
       : 0;

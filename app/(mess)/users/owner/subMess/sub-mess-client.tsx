@@ -37,6 +37,7 @@ import PageSkeleton from "@/components/reusable/loading-skeleton";
 import CreateSubMessDialog from "./sub-mess-create-dialog";
 import {
   DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
   DELETE_BTN_STYLE,
   PARAM_LIMIT,
   PARAM_PAGE,
@@ -44,6 +45,7 @@ import {
   PARAM_SORT_BY,
   PARAM_SORT_ORDER,
 } from "@/lib/constants";
+import { buildListQuery } from "@/lib/helpers/list-query";
 
 const SORT_OPTIONS: { label: string; value: SortBy }[] = [
   { label: "Date Created", value: "created_at" },
@@ -56,7 +58,7 @@ function parseUrlState(searchParams: URLSearchParams) {
   const page = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
   const rawLimit = parseInt(searchParams.get(PARAM_LIMIT) ?? "", 10);
   const limit =
-    isNaN(rawLimit) || rawLimit < 10 || rawLimit > 40
+    isNaN(rawLimit) || rawLimit < 1 || rawLimit > MAX_PAGE_SIZE
       ? DEFAULT_PAGE_SIZE
       : rawLimit;
   const search = searchParams.get(PARAM_SEARCH) ?? "";
@@ -73,13 +75,13 @@ function buildUrl(
   sortBy: SortBy,
   sortOrder: SortOrder,
 ) {
-  const params = new URLSearchParams();
-  if (page > 1) params.set(PARAM_PAGE, String(page));
-  if (limit !== DEFAULT_PAGE_SIZE) params.set(PARAM_LIMIT, String(limit));
-  if (search) params.set(PARAM_SEARCH, search);
-  if (sortBy !== "created_at") params.set(PARAM_SORT_BY, sortBy);
-  if (sortOrder !== "desc") params.set(PARAM_SORT_ORDER, sortOrder);
-  const qs = params.toString();
+  const qs = buildListQuery({
+    [PARAM_PAGE]: page > 1 ? page : undefined,
+    [PARAM_LIMIT]: limit !== DEFAULT_PAGE_SIZE ? limit : undefined,
+    [PARAM_SEARCH]: search || undefined,
+    [PARAM_SORT_BY]: sortBy !== "created_at" ? sortBy : undefined,
+    [PARAM_SORT_ORDER]: sortOrder !== "desc" ? sortOrder : undefined,
+  });
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
@@ -148,7 +150,6 @@ export default function SubMessClient() {
       startLoading(async () => {
         try {
           const result = await fetchSubMesses({
-            mess_id,
             page,
             limit: limitVal,
             search: searchVal,

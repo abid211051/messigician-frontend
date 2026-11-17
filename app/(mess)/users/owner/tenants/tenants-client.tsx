@@ -14,15 +14,15 @@ import { TenantData, SubMessOption } from "./types";
 import { Button } from "@/components/ui/button";
 import {
   fetchTenants,
-  fetchSubMesses,
   deleteTenants,
   updateTenant,
 } from "./actions";
+import { fetchAllSubMesses } from "../subMess/actions";
 import { handleApiError } from "@/lib/helpers/errors";
 import { EditTenantFormValues } from "./validation";
-import { DELETE_BTN_STYLE } from "@/lib/constants";
+import { DEFAULT_PAGE_SIZE, DELETE_BTN_STYLE } from "@/lib/constants";
+import { buildListQuery } from "@/lib/helpers/list-query";
 
-const PAGE_SIZE = 10;
 const PARAM_PAGE = "page";
 const PARAM_SUB_MESS = "sub_mess";
 
@@ -37,11 +37,11 @@ function parseUrlState(searchParams: URLSearchParams) {
 }
 
 function buildUrl(pathname: string, page: number, subMessIds: Set<string>) {
-  const params = new URLSearchParams();
-  if (page > 1) params.set(PARAM_PAGE, String(page));
-  if (subMessIds.size > 0)
-    params.set(PARAM_SUB_MESS, [...subMessIds].join(","));
-  const qs = params.toString();
+  const qs = buildListQuery({
+    [PARAM_PAGE]: page > 1 ? page : undefined,
+    [PARAM_SUB_MESS]:
+      subMessIds.size > 0 ? [...subMessIds].join(",") : undefined,
+  });
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
@@ -84,7 +84,11 @@ export default function TenantsClient() {
       if (!mess_id) return;
       startLoading(async () => {
         try {
-          const result = await fetchTenants({ mess_id, page, sub_mess_ids });
+          const result = await fetchTenants({
+            page,
+            limit: DEFAULT_PAGE_SIZE,
+            sub_mess_ids,
+          });
           setTenants(result.data || []);
           setTotalItems(result.meta?.totalItems || 0);
           setCurrentPage(result.meta?.currentPage || page);
@@ -104,7 +108,7 @@ export default function TenantsClient() {
     if (!mess_id) return;
     startLoading(async () => {
       try {
-        const subMessData = await fetchSubMesses(mess_id);
+        const subMessData = await fetchAllSubMesses();
 
         if (!subMessData || !subMessData.length) {
           setSubMesses([]);
@@ -114,8 +118,8 @@ export default function TenantsClient() {
         setSubMesses(subMessData);
 
         const result = await fetchTenants({
-          mess_id,
           page: initialPage,
+          limit: DEFAULT_PAGE_SIZE,
           sub_mess_ids: initialSubMess,
         });
         setTenants(result.data || []);
@@ -211,6 +215,9 @@ export default function TenantsClient() {
     setIsSaving(true);
     try {
       await updateTenant(id, values);
+      if (mess_id) {
+        setSubMesses(await fetchAllSubMesses());
+      }
       setEditOpen(false);
       setPendingEdit(null);
       loadTenants(currentPage, filteredSubMesses);
@@ -332,7 +339,7 @@ export default function TenantsClient() {
           <DataPagination
             currentPage={currentPage}
             totalItems={totalItems}
-            pageSize={PAGE_SIZE}
+            pageSize={DEFAULT_PAGE_SIZE}
             onPageChange={handlePageChange}
             isLoading={isLoading}
           />

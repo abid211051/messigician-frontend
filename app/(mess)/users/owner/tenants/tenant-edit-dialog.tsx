@@ -95,8 +95,25 @@ export default function EditTenantDialog({
                   className="max-h-52"
                 >
                   {subMesses.map((s) => (
-                    <SelectItem className="min-h-9" key={s.id} value={s.id}>
-                      {s.sub_mess_name}
+                    <SelectItem
+                      className="min-h-9"
+                      key={s.id}
+                      value={s.id}
+                      disabled={s.is_full && s.id !== tenant?.sub_mess_id}
+                    >
+                      <span
+                        className={`size-2 rounded-full ${
+                          s.is_full ? "bg-red-400" : "bg-brand-secondary"
+                        }`}
+                      />
+                      <span>{s.sub_mess_name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {s.is_full
+                          ? "Full"
+                          : `${s.available_seats} ${
+                              s.available_seats === 1 ? "seat" : "seats"
+                            } left`}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

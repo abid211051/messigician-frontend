@@ -5,11 +5,10 @@ export interface SubMessData {
   total_rent: string;
   total_utility: string;
   no_of_seats: number;
-  no_of_members: string;
+  no_of_members: number;
 }
 
 export interface FetchSubMessesParams {
-  mess_id: string;
   page?: number;
   limit?: number;
   search?: string;

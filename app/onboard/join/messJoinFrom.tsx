@@ -100,6 +100,15 @@ const MessJoinForm = () => {
       return;
     }
 
+    const selectedSubMess = foundMess.find((sub) => sub.id === data.sub_mess_id);
+    if (!selectedSubMess || selectedSubMess.is_full) {
+      toast.error("Please select a sub-mess with available seats.", {
+        position: "top-center",
+        richColors: true,
+      });
+      return;
+    }
+
     try {
       await joinRequestApi({
         mess_id: confirmedMessId,
@@ -226,11 +235,23 @@ const MessJoinForm = () => {
                   <SelectItem
                     key={sub.id}
                     value={sub.id}
+                    disabled={sub.is_full}
                     className="py-2.5 cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-brand-secondary shrink-0" />
+                      <div
+                        className={`size-2 rounded-full shrink-0 ${
+                          sub.is_full ? "bg-red-400" : "bg-brand-secondary"
+                        }`}
+                      />
                       <span className="font-medium">{sub.name}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {sub.is_full
+                          ? "Full"
+                          : `${sub.available_seats} ${
+                              sub.available_seats === 1 ? "seat" : "seats"
+                            } left`}
+                      </span>
                     </div>
                   </SelectItem>
                 ))}
@@ -247,7 +268,7 @@ const MessJoinForm = () => {
       <div className="flex items-start gap-2.5 bg-brand-secondary-muted border border-brand-secondary-border rounded-xl p-3">
         <Users className="w-4 h-4 text-brand-secondary shrink-0 mt-0.5" />
         <p className="text-xs text-brand-secondary leading-relaxed">
-          Your request will be sent to the mess owner for approval. You'll be
+          Your request will be sent to the mess owner for approval. You&apos;ll be
           notified once accepted.
         </p>
       </div>

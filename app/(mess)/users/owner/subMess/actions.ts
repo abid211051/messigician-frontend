@@ -1,7 +1,7 @@
 import api from "@/lib/axios";
 import { FetchSubMessesParams } from "./types";
-
-const DEFAULT_PAGE_SIZE = 10;
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
+import { buildListQuery } from "@/lib/helpers/list-query";
 
 export interface CreateSubMessBody {
   fname: string;
@@ -10,25 +10,27 @@ export interface CreateSubMessBody {
 }
 
 export async function fetchSubMesses({
-  mess_id,
   page,
   limit,
   search,
   sortBy,
   sortOrder,
 }: FetchSubMessesParams) {
-  const params = new URLSearchParams();
-  if (page && page > 1) params.set("page", String(page));
-  if (limit && limit !== DEFAULT_PAGE_SIZE) params.set("limit", String(limit));
-  if (search) params.set("search", search);
-  if (sortBy && sortBy !== "created_at") params.set("sortBy", sortBy);
-  if (sortOrder && sortOrder !== "desc") params.set("sortOrder", sortOrder);
-
-  const qs = params.toString();
-  const url = `/sub-mess/all${qs ? `?${qs}` : ""}`;
-  const res = await api.get(url);
+  const query = buildListQuery({
+    page: page ?? 1,
+    limit: limit ?? DEFAULT_PAGE_SIZE,
+    search,
+    sortBy,
+    sortOrder,
+  });
+  const res = await api.get(`/sub-mess/all?${query}`);
 
   return res.data.data;
+}
+
+export async function fetchAllSubMesses() {
+  const res = await api.get("/sub-mess/all");
+  return res.data?.data ?? [];
 }
 
 export async function fetchSingleSubMess(id: string) {
